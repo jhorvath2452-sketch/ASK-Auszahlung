@@ -2,6 +2,14 @@
   "projects": {
     "ask_auszahlung": "ask-mannersdorf"
   },
-  "targets": {},
+  "targets": {
+    "ask-mannersdorf": {
+      "storage": {
+        "default": [
+          "ask-mannersdorf.firebasestorage.app"
+        ]
+      }
+    }
+  },
   "etags": {}
 }

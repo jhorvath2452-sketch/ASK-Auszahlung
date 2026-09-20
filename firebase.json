@@ -10,6 +10,7 @@
     "rules": "firestore.rules"
   },
   "storage": {
-    "rules": "storage.rules"
-  }
+  "target": "default",
+  "rules": "storage.rules"
+}
 }

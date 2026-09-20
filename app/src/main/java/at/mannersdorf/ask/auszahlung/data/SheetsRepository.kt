@@ -18,7 +18,7 @@ import kotlinx.coroutines.tasks.await
  */
 class SheetsRepository {
 
-    private val functions = Firebase.functions
+    private val functions = Firebase.functions("europe-west1")
 
     /** Liefert die Namen aller Tabellenblätter (z.B. Monate) einer Spreadsheet-ID. */
     suspend fun leseTabellenblattNamen(spreadsheetId: String): List<String> {

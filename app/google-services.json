@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "629070978428",
+    "project_id": "ask-mannersdorf",
+    "storage_bucket": "ask-mannersdorf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:629070978428:android:4bdeb87c8d562fe49818f9",
+        "android_client_info": {
+          "package_name": "at.mannersdorf.ask.auszahlung"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDEpJKXNY0o8kbTfQPB3fXCPhy3VWm6KMI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

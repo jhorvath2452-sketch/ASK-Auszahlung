@@ -1,0 +1,79 @@
+package at.mannersdorf.ask.auszahlung.data
+
+import android.content.Context
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import at.mannersdorf.ask.auszahlung.data.model.SpaltenZuordnung
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+
+private val Context.dataStore by preferencesDataStore(name = "ask_auszahlung_settings")
+
+/**
+ * Speichert alles, was in den Einstellungen konfigurierbar ist: die drei Sheet-IDs
+ * und die Spaltenzuordnung der Kosten-Spielbetrieb-Tabelle. So muss nichts hart
+ * codiert werden, falls sich das Tabellen-Layout ändert. Die Speicherung der
+ * Bestätigungen selbst läuft über Firebase (Konfiguration kommt aus
+ * app/google-services.json, nicht aus diesen Einstellungen).
+ */
+class SettingsStore(private val context: Context) {
+
+    private object Keys {
+        val TRAININGSLISTE_SHEET_ID = stringPreferencesKey("trainingsliste_sheet_id")
+        val KOSTEN_SPIELBETRIEB_SHEET_ID = stringPreferencesKey("kosten_spielbetrieb_sheet_id")
+        val BESTAETIGUNG_SHEET_ID = stringPreferencesKey("bestaetigung_sheet_id")
+        val SPALTE_NAME = stringPreferencesKey("spalte_name")
+        val SPALTE_FIXUM = stringPreferencesKey("spalte_fixum")
+        val SPALTE_PUNKTE = stringPreferencesKey("spalte_punkte")
+        val SPALTE_ABZUG_SONSTIGES = stringPreferencesKey("spalte_abzug_sonstiges")
+        val SPALTE_ABZUG_MASSEUR = stringPreferencesKey("spalte_abzug_masseur")
+    }
+
+    // Standardwerte = die drei vom Verein bereits genutzten Google Sheets.
+    companion object {
+        const val STANDARD_TRAININGSLISTE_ID = "1Nl5F1yldZqP4ynr95D9v_6V_NGT6fZOxF9JSxt0jDdM"
+        const val STANDARD_KOSTEN_SPIELBETRIEB_ID = "1dXEs3xbxmoxiPMXPJImKOXe95A46MyiFEjzlMZsUAD0"
+        const val STANDARD_BESTAETIGUNG_ID = "10oE94grUj815c9CZfBzf8bvb27hENpk3JKOm8REUlyg"
+    }
+
+    val trainingslisteSheetId: Flow<String> = context.dataStore.data
+        .map { it[Keys.TRAININGSLISTE_SHEET_ID] ?: STANDARD_TRAININGSLISTE_ID }
+
+    val kostenSpielbetriebSheetId: Flow<String> = context.dataStore.data
+        .map { it[Keys.KOSTEN_SPIELBETRIEB_SHEET_ID] ?: STANDARD_KOSTEN_SPIELBETRIEB_ID }
+
+    val bestaetigungSheetId: Flow<String> = context.dataStore.data
+        .map { it[Keys.BESTAETIGUNG_SHEET_ID] ?: STANDARD_BESTAETIGUNG_ID }
+
+    val spaltenZuordnung: Flow<SpaltenZuordnung> = context.dataStore.data.map {
+        SpaltenZuordnung(
+            nameSpalte = it[Keys.SPALTE_NAME] ?: "A",
+            fixumSpalte = it[Keys.SPALTE_FIXUM] ?: "B",
+            punkteSpalte = it[Keys.SPALTE_PUNKTE] ?: "C",
+            abzugSonstigesSpalte = it[Keys.SPALTE_ABZUG_SONSTIGES] ?: "I",
+            abzugMasseurSpalte = it[Keys.SPALTE_ABZUG_MASSEUR] ?: "J"
+        )
+    }
+
+    suspend fun leseAlleEinstellungenEinmalig() = context.dataStore.data.first()
+
+    suspend fun speichereSheetIds(trainingsliste: String, kostenSpielbetrieb: String, bestaetigung: String) {
+        context.dataStore.edit {
+            it[Keys.TRAININGSLISTE_SHEET_ID] = trainingsliste
+            it[Keys.KOSTEN_SPIELBETRIEB_SHEET_ID] = kostenSpielbetrieb
+            it[Keys.BESTAETIGUNG_SHEET_ID] = bestaetigung
+        }
+    }
+
+    suspend fun speichereSpaltenZuordnung(zuordnung: SpaltenZuordnung) {
+        context.dataStore.edit {
+            it[Keys.SPALTE_NAME] = zuordnung.nameSpalte
+            it[Keys.SPALTE_FIXUM] = zuordnung.fixumSpalte
+            it[Keys.SPALTE_PUNKTE] = zuordnung.punkteSpalte
+            it[Keys.SPALTE_ABZUG_SONSTIGES] = zuordnung.abzugSonstigesSpalte
+            it[Keys.SPALTE_ABZUG_MASSEUR] = zuordnung.abzugMasseurSpalte
+        }
+    }
+}

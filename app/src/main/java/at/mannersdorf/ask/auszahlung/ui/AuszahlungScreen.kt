@@ -42,7 +42,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import at.mannersdorf.ask.auszahlung.data.formatiereDeutscheZahl
 import at.mannersdorf.ask.auszahlung.data.model.SpielerKosten
+import at.mannersdorf.ask.auszahlung.data.parseDeutscheZahl
 
 private const val KORREKTUR_MIN = -2000.0
 private const val KORREKTUR_MAX = 2000.0
@@ -118,8 +120,8 @@ fun AuszahlungScreen(
                 Spacer(Modifier.height(4.dp))
                 Text("Monat: ${monat ?: "-"}", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
-                InfoZeile("FIXUM", "€ ${spieler.fixum}")
-                InfoZeile("Punkte", berechnePunkteBetrag(spieler))
+                InfoZeile("FIXUM", "€ ${spieler.fixum.replace("€", "").trim()}")
+                InfoZeile("Punkte pro Monat", berechnePunkteBetrag(spieler))
                 InfoZeile("Abzug Masseur", spieler.abzugMasseur)
                 InfoZeile("Abzug Sonstiges", spieler.abzugSonstiges)
             }
@@ -225,31 +227,31 @@ private fun InfoZeile(bezeichnung: String, wert: String) {
     }
 }
 
-/** Punkte-Betrag = Spalte D (Punkte) × Spalte O (Punkte-Multiplikator). */
+/** Punkte pro Monat = Spalte D (Punkte) × Spalte O (Punkte-Multiplikator). */
 private fun berechnePunkteBetrag(spieler: SpielerKosten): String {
-    val punkte = spieler.punkte.replace(",", ".").toDoubleOrNull()
-    val multiplikator = spieler.punkteMultiplikator.replace(",", ".").toDoubleOrNull()
+    val punkte = parseDeutscheZahl(spieler.punkte)
+    val multiplikator = parseDeutscheZahl(spieler.punkteMultiplikator)
     if (punkte == null || multiplikator == null) return spieler.punkte
-    return String.format("%.2f", punkte * multiplikator)
+    return "€ " + formatiereDeutscheZahl(punkte * multiplikator)
 }
 
-/** Ausbezahlter Betrag = FIXUM + Punkte − Abzug Masseur − Abzug Sonstiges + Korrektur. */
+/** Ausbezahlter Betrag = FIXUM + Punkte pro Monat − Abzug Masseur − Abzug Sonstiges + Korrektur. */
 private fun berechneAusbezahltenBetrag(spieler: SpielerKosten?, korrekturText: String): String {
     if (spieler == null) return ""
-    val fixum = spieler.fixum.replace(",", ".").toDoubleOrNull() ?: 0.0
-    val punkte = spieler.punkte.replace(",", ".").toDoubleOrNull() ?: 0.0
-    val multiplikator = spieler.punkteMultiplikator.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val fixum = parseDeutscheZahl(spieler.fixum) ?: 0.0
+    val punkte = parseDeutscheZahl(spieler.punkte) ?: 0.0
+    val multiplikator = parseDeutscheZahl(spieler.punkteMultiplikator) ?: 0.0
     val punkteBetrag = punkte * multiplikator
-    val abzugMasseur = spieler.abzugMasseur.replace(",", ".").toDoubleOrNull() ?: 0.0
-    val abzugSonstiges = spieler.abzugSonstiges.replace(",", ".").toDoubleOrNull() ?: 0.0
-    val korrektur = korrekturText.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val abzugMasseur = parseDeutscheZahl(spieler.abzugMasseur) ?: 0.0
+    val abzugSonstiges = parseDeutscheZahl(spieler.abzugSonstiges) ?: 0.0
+    val korrektur = parseDeutscheZahl(korrekturText) ?: 0.0
     val summe = fixum + punkteBetrag - abzugMasseur - abzugSonstiges + korrektur
-    return String.format("%.2f", summe)
+    return formatiereDeutscheZahl(summe)
 }
 
 /** Begrenzt die Korrektur-Eingabe auf -2000 bis +2000, erlaubt aber Zwischenzustände beim Tippen. */
 private fun begrenzeKorrektur(eingabe: String): String {
-    val zahl = eingabe.replace(",", ".").toDoubleOrNull() ?: return eingabe
+    val zahl = parseDeutscheZahl(eingabe) ?: return eingabe
     return when {
         zahl > KORREKTUR_MAX -> KORREKTUR_MAX.toInt().toString()
         zahl < KORREKTUR_MIN -> KORREKTUR_MIN.toInt().toString()

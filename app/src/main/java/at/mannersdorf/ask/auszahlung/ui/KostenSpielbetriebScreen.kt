@@ -20,7 +20,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import at.mannersdorf.ask.auszahlung.data.formatiereDeutscheZahl
 import at.mannersdorf.ask.auszahlung.data.model.KostenSpielbetriebDaten
+import at.mannersdorf.ask.auszahlung.data.parseDeutscheZahl
 
 private val SPALTENBREITE = 108.dp
 private val NAMENSSPALTENBREITE = 168.dp
@@ -111,7 +113,7 @@ private fun fuegeSummenzeileEin(rohZeilen: List<List<String>>): List<List<String
     var summeAbzFix = 0.0
     var summeAbzMan = 0.0
 
-    fun zuZahl(text: String?): Double = text?.trim()?.replace(",", ".")?.toDoubleOrNull() ?: 0.0
+    fun zuZahl(text: String?): Double = parseDeutscheZahl(text) ?: 0.0
 
     for (i in headerIndex + 1 until rohZeilen.size) {
         val zeile = rohZeilen[i]
@@ -128,9 +130,9 @@ private fun fuegeSummenzeileEin(rohZeilen: List<List<String>>): List<List<String
     val spaltenAnzahl = kopfzeile.size
     val summenzeile = MutableList(spaltenAnzahl) { "" }
     summenzeile[0] = SUMMENZEILEN_MARKIERUNG
-    if (auszahlungIdx in summenzeile.indices) summenzeile[auszahlungIdx] = "%.2f".format(summeAuszahlung)
-    if (abzFixIdx in summenzeile.indices) summenzeile[abzFixIdx] = "%.2f".format(summeAbzFix)
-    if (abzManIdx in summenzeile.indices) summenzeile[abzManIdx] = "%.2f".format(summeAbzMan)
+    if (auszahlungIdx in summenzeile.indices) summenzeile[auszahlungIdx] = formatiereDeutscheZahl(summeAuszahlung)
+    if (abzFixIdx in summenzeile.indices) summenzeile[abzFixIdx] = formatiereDeutscheZahl(summeAbzFix)
+    if (abzManIdx in summenzeile.indices) summenzeile[abzManIdx] = formatiereDeutscheZahl(summeAbzMan)
 
     val ergebnis = rohZeilen.toMutableList()
     ergebnis.add(letzteSpielerZeile + 1, summenzeile)

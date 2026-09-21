@@ -36,7 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import at.mannersdorf.ask.auszahlung.R
@@ -159,10 +159,10 @@ fun MainScreen(viewModel: MainViewModel) {
 }
 
 /**
- * Eigene, größere Kopfzeile statt der Standard-TopAppBar: ASK-Wappen links,
- * mittig groß/fett "ASK MANNERSDORF AUSZAHLUNG" plus darunter der
- * "#manaschdooaaf ©chigo2452"-Schriftzug in Schreibmaschinen-Optik, mit
- * dezenten Fußballplatz-Linien im Hintergrund.
+ * Eigene, größere Kopfzeile statt der Standard-TopAppBar: ASK-Wappen links
+ * (100dp, vertikal mittig), mittig groß "ASK MANNERSDORF" mit "#manaschdooaaf"
+ * darunter (beide etwa halbe Kopfzeilenhöhe), "©chigo2452" groß unten rechts
+ * in der Ecke, dezente Fußballplatz-Linien im Hintergrund.
  */
 @Composable
 private fun AppKopfzeile(
@@ -172,7 +172,7 @@ private fun AppKopfzeile(
     onEinstellungen: () -> Unit
 ) {
     Box(Modifier.fillMaxWidth().background(VereinsGruen)) {
-        FussballplatzHintergrund(Modifier.fillMaxWidth().height(118.dp))
+        FussballplatzHintergrund(Modifier.matchParentSize())
 
         Row(
             Modifier
@@ -183,29 +183,30 @@ private fun AppKopfzeile(
             Image(
                 painter = painterResource(R.drawable.ask_wappen),
                 contentDescription = "ASK Mannersdorf Wappen",
-                modifier = Modifier.size(56.dp)
+                modifier = Modifier.height(100.dp)
             )
 
-            Spacer(Modifier.padding(horizontal = 6.dp))
+            Spacer(Modifier.width(8.dp))
 
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    if (zeigtEinstellungen) "EINSTELLUNGEN" else "ASK MANNERSDORF AUSZAHLUNG",
+                    if (zeigtEinstellungen) "EINSTELLUNGEN" else "ASK MANNERSDORF",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    textAlign = TextAlign.Center
+                    fontSize = 44.sp,
+                    lineHeight = 46.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (!zeigtEinstellungen) {
                     Text(
-                        "#manaschdooaaf   ©chigo2452",
+                        "#manaschdooaaf",
                         color = Color.White,
                         fontFamily = SchreibmaschinenSchrift,
-                        fontSize = 13.sp,
-                        textAlign = TextAlign.Center
+                        fontSize = 36.sp,
+                        lineHeight = 38.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -220,6 +221,18 @@ private fun AppKopfzeile(
                     }
                 }
             }
+        }
+
+        if (!zeigtEinstellungen) {
+            Text(
+                "©chigo2452",
+                color = Color.White,
+                fontFamily = SchreibmaschinenSchrift,
+                fontSize = 26.sp,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 12.dp, bottom = 6.dp)
+            )
         }
     }
 }

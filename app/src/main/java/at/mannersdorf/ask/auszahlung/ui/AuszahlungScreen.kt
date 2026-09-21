@@ -234,12 +234,12 @@ private fun InfoZeile(bezeichnung: String, wert: String) {
     }
 }
 
-/** PUNKTE-Betrag = Spalte O ("Punkte pro Monat") × FIXUM (Spalte B). */
+/** PUNKTE-Betrag = Spalte D ("Punkte") × Spalte O ("Punkte pro Monat"). */
 private fun berechnePunkteBetrag(spieler: SpielerKosten): String {
+    val punkte = parseDeutscheZahl(spieler.punkte)
     val punkteProMonat = parseDeutscheZahl(spieler.punkteMultiplikator)
-    val fixum = parseDeutscheZahl(spieler.fixum)
-    if (punkteProMonat == null || fixum == null) return spieler.punkteMultiplikator
-    return "€ " + formatiereDeutscheZahl(punkteProMonat * fixum)
+    if (punkte == null || punkteProMonat == null) return spieler.punkteMultiplikator
+    return "€ " + formatiereDeutscheZahl(punkte * punkteProMonat)
 }
 
 /**
@@ -257,8 +257,9 @@ private fun zeigeWertOderRoh(rohwert: String): String {
 private fun berechneAusbezahltenBetrag(spieler: SpielerKosten?, korrekturText: String): String {
     if (spieler == null) return ""
     val fixum = parseDeutscheZahl(spieler.fixum) ?: 0.0
+    val punkte = parseDeutscheZahl(spieler.punkte) ?: 0.0
     val punkteProMonat = parseDeutscheZahl(spieler.punkteMultiplikator) ?: 0.0
-    val punkteBetrag = punkteProMonat * fixum
+    val punkteBetrag = punkte * punkteProMonat
     val abzugMasseur = parseDeutscheZahl(spieler.abzugMasseur) ?: 0.0
     val abzugSonstiges = parseDeutscheZahl(spieler.abzugSonstiges) ?: 0.0
     val korrektur = parseDeutscheZahl(korrekturText) ?: 0.0

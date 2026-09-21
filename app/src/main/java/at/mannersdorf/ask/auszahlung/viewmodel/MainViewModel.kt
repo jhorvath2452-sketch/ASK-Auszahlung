@@ -25,12 +25,20 @@ data class HauptZustand(
     /** true, sobald die anonyme Firebase-Anmeldung + der erste Datenabruf durch sind. */
     val bereit: Boolean = false,
     val aktiveEbene: Ebene = Ebene.TRAININGSLISTE,
-    val verfuegbareMonate: List<String> = emptyList(),
-    val gewaehlterMonat: String? = null,
     val ladeVorgang: Boolean = false,
     val fehler: String? = null,
+
+    // EIN gemeinsamer Monat für beide Tabellen, da gleiche Monate zusammengehören
+    // (z.B. "Juli 2026" in der Trainingsliste = "Juli 2026" bei Kosten Spielbetrieb).
+    // Die Liste enthält nur Tab-Namen, die in BEIDEN Tabellen existieren - reine
+    // Übersichts-Tabs wie "GESAMT", die es nur in einer der beiden Tabellen gibt,
+    // fallen damit automatisch raus.
+    val verfuegbareMonate: List<String> = emptyList(),
+    val gewaehlterMonat: String? = null,
+
     val trainingsliste: TrainingslisteDaten? = null,
     val kostenSpielbetrieb: KostenSpielbetriebDaten? = null,
+
     val gewaehlterSpieler: String? = null,
     val speichernErfolgreich: Boolean = false,
     val trainingslisteSheetId: String = "",
@@ -80,14 +88,26 @@ class MainViewModel(private val context: Context) : ViewModel() {
         _zustand.value = _zustand.value.copy(aktiveEbene = ebene)
     }
 
+    /**
+     * Lädt die Tab-Listen BEIDER Tabellen und bildet die Schnittmenge: nur
+     * Monate, die in beiden Tabellen als Tab existieren, sind auswählbar.
+     */
     private suspend fun ladeMonatsListe() {
         setLaden(true)
         try {
-            val sheetId = settingsStore.trainingslisteSheetId.first()
-            val monate = sheetsRepository.leseTabellenblattNamen(sheetId)
-            val vorausgewaehlt = monate.lastOrNull()
+            val trainingslisteSheetId = settingsStore.trainingslisteSheetId.first()
+            val kostenSpielbetriebSheetId = settingsStore.kostenSpielbetriebSheetId.first()
+
+            val trainingslisteTabs = sheetsRepository.leseTabellenblattNamen(trainingslisteSheetId)
+            val kostenSpielbetriebTabs = sheetsRepository.leseTabellenblattNamen(kostenSpielbetriebSheetId)
+            val kostenSpielbetriebTabsSet = kostenSpielbetriebTabs.toSet()
+
+            // Reihenfolge der Trainingsliste beibehalten, aber nur gemeinsame Monate.
+            val gemeinsameMonate = trainingslisteTabs.filter { it in kostenSpielbetriebTabsSet }
+            val vorausgewaehlt = gemeinsameMonate.lastOrNull()
+
             _zustand.value = _zustand.value.copy(
-                verfuegbareMonate = monate,
+                verfuegbareMonate = gemeinsameMonate,
                 gewaehlterMonat = vorausgewaehlt,
                 fehler = null
             )
@@ -129,7 +149,7 @@ class MainViewModel(private val context: Context) : ViewModel() {
             val ersterSpieler = daten.spieler.firstOrNull()?.name
             _zustand.value = _zustand.value.copy(
                 kostenSpielbetrieb = daten,
-                gewaehlterSpieler = _zustand.value.gewaehlterSpieler ?: ersterSpieler,
+                gewaehlterSpieler = ersterSpieler,
                 fehler = null
             )
         } catch (e: Exception) {

@@ -10,15 +10,12 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
@@ -88,10 +85,12 @@ fun MainScreen(viewModel: MainViewModel) {
                 else -> {
                     Column(Modifier.fillMaxSize()) {
                         if (zustand.verfuegbareMonate.isNotEmpty()) {
-                            MonatsAuswahl(
+                            MonatsDropdown(
+                                label = "Monat",
                                 monate = zustand.verfuegbareMonate,
                                 gewaehlterMonat = zustand.gewaehlterMonat,
-                                onMonatGewaehlt = viewModel::waehleMonat
+                                onMonatGewaehlt = viewModel::waehleMonat,
+                                modifier = Modifier.padding(12.dp)
                             )
                         }
 
@@ -99,17 +98,17 @@ fun MainScreen(viewModel: MainViewModel) {
                             SegmentedButton(
                                 selected = zustand.aktiveEbene == Ebene.TRAININGSLISTE,
                                 onClick = { viewModel.wechsleEbene(Ebene.TRAININGSLISTE) },
-                                shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 3)
+                                shape = SegmentedButtonDefaults.itemShape(0, 3)
                             ) { Text("Training") }
                             SegmentedButton(
                                 selected = zustand.aktiveEbene == Ebene.KOSTEN_SPIELBETRIEB,
                                 onClick = { viewModel.wechsleEbene(Ebene.KOSTEN_SPIELBETRIEB) },
-                                shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 3)
+                                shape = SegmentedButtonDefaults.itemShape(1, 3)
                             ) { Text("Kosten") }
                             SegmentedButton(
                                 selected = zustand.aktiveEbene == Ebene.SPIELER,
                                 onClick = { viewModel.wechsleEbene(Ebene.SPIELER) },
-                                shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(2, 3)
+                                shape = SegmentedButtonDefaults.itemShape(2, 3)
                             ) { Text("Spieler") }
                         }
 
@@ -138,37 +137,6 @@ fun MainScreen(viewModel: MainViewModel) {
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MonatsAuswahl(monate: List<String>, gewaehlterMonat: String?, onMonatGewaehlt: (String) -> Unit) {
-    var offen by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(
-        expanded = offen,
-        onExpandedChange = { offen = it },
-        modifier = Modifier.padding(12.dp)
-    ) {
-        OutlinedTextField(
-            value = gewaehlterMonat ?: "",
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Monat") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = offen) },
-            modifier = Modifier.fillMaxWidth().menuAnchor()
-        )
-        ExposedDropdownMenu(expanded = offen, onDismissRequest = { offen = false }) {
-            monate.forEach { monat ->
-                DropdownMenuItem(
-                    text = { Text(monat) },
-                    onClick = {
-                        onMonatGewaehlt(monat)
-                        offen = false
-                    }
-                )
             }
         }
     }

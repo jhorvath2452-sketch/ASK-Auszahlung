@@ -18,6 +18,9 @@ import kotlinx.coroutines.tasks.await
  */
 class SheetsRepository {
 
+    // Region muss zur Region der deployten Cloud Function passen (europe-west1,
+    // siehe functions/index.js) - der Android-Client verbindet sich sonst
+    // standardmäßig mit us-central1 und findet die Funktion dort nicht (NOT_FOUND).
     private val functions = Firebase.functions("europe-west1")
 
     /** Liefert die Namen aller Tabellenblätter (z.B. Monate) einer Spreadsheet-ID. */

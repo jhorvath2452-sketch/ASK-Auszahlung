@@ -121,7 +121,10 @@ fun AuszahlungScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text("Monat: ${monat ?: "-"}", fontWeight = FontWeight.Bold)
-                Text("Punkte pro Monat: € ${formatiereDeutscheZahl(parseDeutscheZahl(spieler.punkteMultiplikator) ?: 0.0)}", fontWeight = FontWeight.Bold)
+                Text(
+                    "Punkte pro Monat: " + zeigeWertOderRoh(spieler.punkteMultiplikator),
+                    fontWeight = FontWeight.Bold
+                )
                 Spacer(Modifier.height(12.dp))
                 InfoZeile("FIXUM", "€ ${spieler.fixum.replace("€", "").trim()}")
                 InfoZeile("PUNKTE", berechnePunkteBetrag(spieler))
@@ -237,6 +240,17 @@ private fun berechnePunkteBetrag(spieler: SpielerKosten): String {
     val fixum = parseDeutscheZahl(spieler.fixum)
     if (punkteProMonat == null || fixum == null) return spieler.punkteMultiplikator
     return "€ " + formatiereDeutscheZahl(punkteProMonat * fixum)
+}
+
+/**
+ * Zeigt den formatierten Euro-Betrag, falls der Rohwert aus dem Sheet als Zahl
+ * gelesen werden konnte - sonst den Rohwert selbst (z.B. leer oder Text), damit
+ * sofort sichtbar ist, WAS tatsächlich aus der Tabelle angekommen ist, statt
+ * das still als € 0,00 zu verstecken.
+ */
+private fun zeigeWertOderRoh(rohwert: String): String {
+    val zahl = parseDeutscheZahl(rohwert)
+    return if (zahl != null) "€ " + formatiereDeutscheZahl(zahl) else "(Rohwert: \"$rohwert\")"
 }
 
 /** Ausbezahlter Betrag = FIXUM + PUNKTE − Abzug Masseur − Abzug Sonstiges + Korrektur. */

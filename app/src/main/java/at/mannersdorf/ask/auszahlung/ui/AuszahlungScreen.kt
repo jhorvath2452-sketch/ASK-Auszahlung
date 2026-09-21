@@ -112,7 +112,7 @@ fun AuszahlungScreen(
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
                 Text(
-                    "${spieler.name}  (€ ${spieler.fixum}  |  ${spieler.punkte})",
+                    "${spieler.name}  (Fixkosten: ${spieler.fixum}  |  AP: ${spieler.ap}  |  Punkte: ${spieler.punkte})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -120,7 +120,7 @@ fun AuszahlungScreen(
                 Text("Monat: ${monat ?: "-"}", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
                 InfoZeile("FIXUM", "€ ${spieler.fixum}")
-                InfoZeile("Punkte", spieler.punkte)
+                InfoZeile("Punkte", berechnePunkteBetrag(spieler))
                 InfoZeile("Abzug Masseur", spieler.abzugMasseur)
                 InfoZeile("Abzug Sonstiges", spieler.abzugSonstiges)
             }
@@ -153,7 +153,7 @@ fun AuszahlungScreen(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(120.dp)
+                .height(180.dp)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .border(1.dp, MaterialTheme.colorScheme.outline)
                 .clickable { zeigeSignaturPad = true },
@@ -221,4 +221,12 @@ private fun berechneNettoBetrag(spieler: SpielerKosten?): String {
     val abzugSonstiges = spieler.abzugSonstiges.replace(",", ".").toDoubleOrNull() ?: 0.0
     val netto = fixum - abzugMasseur - abzugSonstiges
     return String.format("%.2f", netto)
+}
+
+/** Punkte-Betrag = Spalte D (Punkte) × Spalte O (Punkte-Multiplikator). */
+private fun berechnePunkteBetrag(spieler: SpielerKosten): String {
+    val punkte = spieler.punkte.replace(",", ".").toDoubleOrNull()
+    val multiplikator = spieler.punkteMultiplikator.replace(",", ".").toDoubleOrNull()
+    if (punkte == null || multiplikator == null) return spieler.punkte
+    return String.format("%.2f", punkte * multiplikator)
 }

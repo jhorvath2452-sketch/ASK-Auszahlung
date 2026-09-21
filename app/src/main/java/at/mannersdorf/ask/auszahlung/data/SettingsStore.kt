@@ -26,7 +26,9 @@ class SettingsStore(private val context: Context) {
         val BESTAETIGUNG_SHEET_ID = stringPreferencesKey("bestaetigung_sheet_id")
         val SPALTE_NAME = stringPreferencesKey("spalte_name")
         val SPALTE_FIXUM = stringPreferencesKey("spalte_fixum")
+        val SPALTE_AP = stringPreferencesKey("spalte_ap")
         val SPALTE_PUNKTE = stringPreferencesKey("spalte_punkte")
+        val SPALTE_PUNKTE_MULTIPLIKATOR = stringPreferencesKey("spalte_punkte_multiplikator")
         val SPALTE_ABZUG_SONSTIGES = stringPreferencesKey("spalte_abzug_sonstiges")
         val SPALTE_ABZUG_MASSEUR = stringPreferencesKey("spalte_abzug_masseur")
     }
@@ -51,7 +53,9 @@ class SettingsStore(private val context: Context) {
         SpaltenZuordnung(
             nameSpalte = it[Keys.SPALTE_NAME] ?: "A",
             fixumSpalte = it[Keys.SPALTE_FIXUM] ?: "B",
-            punkteSpalte = it[Keys.SPALTE_PUNKTE] ?: "C",
+            apSpalte = it[Keys.SPALTE_AP] ?: "C",
+            punkteSpalte = it[Keys.SPALTE_PUNKTE] ?: "D",
+            punkteMultiplikatorSpalte = it[Keys.SPALTE_PUNKTE_MULTIPLIKATOR] ?: "O",
             abzugSonstigesSpalte = it[Keys.SPALTE_ABZUG_SONSTIGES] ?: "I",
             abzugMasseurSpalte = it[Keys.SPALTE_ABZUG_MASSEUR] ?: "J"
         )
@@ -71,7 +75,9 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit {
             it[Keys.SPALTE_NAME] = zuordnung.nameSpalte
             it[Keys.SPALTE_FIXUM] = zuordnung.fixumSpalte
+            it[Keys.SPALTE_AP] = zuordnung.apSpalte
             it[Keys.SPALTE_PUNKTE] = zuordnung.punkteSpalte
+            it[Keys.SPALTE_PUNKTE_MULTIPLIKATOR] = zuordnung.punkteMultiplikatorSpalte
             it[Keys.SPALTE_ABZUG_SONSTIGES] = zuordnung.abzugSonstigesSpalte
             it[Keys.SPALTE_ABZUG_MASSEUR] = zuordnung.abzugMasseurSpalte
         }

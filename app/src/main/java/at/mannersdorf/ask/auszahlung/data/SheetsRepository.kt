@@ -10,17 +10,12 @@ import com.google.firebase.functions.functions
 import kotlinx.coroutines.tasks.await
 
 /**
- * Liest Trainingsliste und Kosten-Spielbetrieb NICHT mehr direkt per Google-OAuth
- * aus der App, sondern über die Firebase Cloud Function "sheetsProxy" (siehe
- * /functions). Die Function greift serverseitig mit einem Service Account auf
- * die Sheets zu - die App selbst braucht dafür keinen Google-Login mehr, nur
- * die ohnehin vorhandene (automatische, anonyme) Firebase-Anmeldung.
+ * Liest Trainingsliste und Kosten-Spielbetrieb über die Firebase Cloud Function
+ * "sheetsProxy" (siehe /functions). Die App braucht dafür keinen Google-Login,
+ * nur die automatische, anonyme Firebase-Anmeldung.
  */
 class SheetsRepository {
 
-    // Region muss zur Region der deployten Cloud Function passen (europe-west1,
-    // siehe functions/index.js) - der Android-Client verbindet sich sonst
-    // standardmäßig mit us-central1 und findet die Funktion dort nicht (NOT_FOUND).
     private val functions = Firebase.functions("europe-west1")
 
     /** Liefert die Namen aller Tabellenblätter (z.B. Monate) einer Spreadsheet-ID. */
@@ -30,7 +25,11 @@ class SheetsRepository {
         return (ergebnis["tabs"] as? List<String>) ?: emptyList()
     }
 
-    /** Ebene 1: Trainingsliste für einen Monat (Tab-Namen), Spalten A:AM bis zur "ENDE"-Zeile. */
+    /**
+     * Ebene 1: Trainingsliste für einen Monat (Tab-Namen), Spalten A:AM.
+     * Letzte Datenzeile ist die Zeile VOR der Zeile "Masseur Ersatz" in Spalte A
+     * (diese Markierungszeile selbst wird nicht angezeigt).
+     */
     suspend fun leseTrainingsliste(spreadsheetId: String, monat: String): TrainingslisteDaten {
         val werte = leseRohWerte(spreadsheetId, "'$monat'!A1:AM1000")
         if (werte.isEmpty()) return TrainingslisteDaten(monat, emptyList(), emptyList())
@@ -40,48 +39,78 @@ class SheetsRepository {
         for (i in 1 until werte.size) {
             val zeile = werte[i]
             val ersteSpalte = zeile.getOrNull(0)?.trim() ?: ""
-            if (ersteSpalte.equals("ENDE", ignoreCase = true)) break
+            if (ersteSpalte.equals("Masseur Ersatz", ignoreCase = true)) break
             if (zeile.all { it.isBlank() }) continue
             datenZeilen.add(TrainingslisteZeile(zeilenNummer = i + 1, werte = zeile))
         }
         return TrainingslisteDaten(monat, kopfzeile, datenZeilen)
     }
 
-    /** Ebene 2 / Basis für Ebene 3: Kosten-Spielbetrieb-Tabelle für einen Monat. */
+    /**
+     * Ebene 2 ("Kosten") + Basis für Ebene 3 ("Spieler"): liefert sowohl die
+     * kompletten Rohzeilen (für eine an das Google Sheet angelehnte Anzeige) als
+     * auch die daraus geparste Spielerliste (feste Spaltenbuchstaben, siehe
+     * SpaltenZuordnung). Die Spielerzeilen werden ab der Kopfzeile erkannt, deren
+     * erste beiden Zellen "Name" und "Fixkosten" enthalten und die mindestens 5
+     * befüllte Spalten hat (unterscheidet die große Detailtabelle von einem
+     * kleineren "Name/Fixkosten/Bemerkung"-Block weiter oben im Sheet).
+     */
     suspend fun leseKostenSpielbetrieb(
         spreadsheetId: String,
         monat: String,
         spalten: SpaltenZuordnung
     ): KostenSpielbetriebDaten {
-        val werte = leseRohWerte(spreadsheetId, "'$monat'!A1:Z500")
+        val werte = leseRohWerte(spreadsheetId, "'$monat'!A1:S500")
         if (werte.isEmpty()) return KostenSpielbetriebDaten(monat, emptyList(), emptyList())
 
-        val kopfzeile = werte[0]
         val nameIdx = spaltenBuchstabeZuIndex(spalten.nameSpalte)
         val fixumIdx = spaltenBuchstabeZuIndex(spalten.fixumSpalte)
+        val apIdx = spaltenBuchstabeZuIndex(spalten.apSpalte)
         val punkteIdx = spaltenBuchstabeZuIndex(spalten.punkteSpalte)
+        val punkteMultIdx = spaltenBuchstabeZuIndex(spalten.punkteMultiplikatorSpalte)
         val sonstigesIdx = spaltenBuchstabeZuIndex(spalten.abzugSonstigesSpalte)
         val masseurIdx = spaltenBuchstabeZuIndex(spalten.abzugMasseurSpalte)
 
-        val spielerListe = mutableListOf<SpielerKosten>()
-        for (i in 1 until werte.size) {
+        // Start der Detail-Spielertabelle finden (zweite "Name/Fixkosten"-Kopfzeile).
+        var startZeile = -1
+        for (i in werte.indices) {
             val zeile = werte[i]
-            val name = zeile.getOrNull(nameIdx)?.trim() ?: ""
-            if (name.equals("ENDE", ignoreCase = true)) break
-            if (name.isBlank()) continue
-            spielerListe.add(
-                SpielerKosten(
-                    zeilenNummer = i + 1,
-                    name = name,
-                    fixum = zeile.getOrNull(fixumIdx) ?: "",
-                    punkte = zeile.getOrNull(punkteIdx) ?: "",
-                    abzugSonstiges = zeile.getOrNull(sonstigesIdx) ?: "",
-                    abzugMasseur = zeile.getOrNull(masseurIdx) ?: "",
-                    rohWerte = zeile
-                )
-            )
+            val ersteZelle = zeile.getOrNull(0)?.trim() ?: ""
+            val zweiteZelle = zeile.getOrNull(1)?.trim() ?: ""
+            val befuellteSpalten = zeile.count { it.isNotBlank() }
+            if (ersteZelle.equals("Name", ignoreCase = true) &&
+                zweiteZelle.contains("Fixkosten", ignoreCase = true) &&
+                befuellteSpalten >= 5
+            ) {
+                startZeile = i + 1
+                break
+            }
         }
-        return KostenSpielbetriebDaten(monat, kopfzeile, spielerListe)
+
+        val spielerListe = mutableListOf<SpielerKosten>()
+        if (startZeile >= 0) {
+            for (i in startZeile until werte.size) {
+                val zeile = werte[i]
+                val name = zeile.getOrNull(nameIdx)?.trim() ?: ""
+                if (name.equals("ENDE", ignoreCase = true)) break
+                if (name.isBlank()) continue
+                spielerListe.add(
+                    SpielerKosten(
+                        zeilenNummer = i + 1,
+                        name = name,
+                        fixum = zeile.getOrNull(fixumIdx) ?: "",
+                        ap = zeile.getOrNull(apIdx) ?: "",
+                        punkte = zeile.getOrNull(punkteIdx) ?: "",
+                        punkteMultiplikator = zeile.getOrNull(punkteMultIdx) ?: "",
+                        abzugSonstiges = zeile.getOrNull(sonstigesIdx) ?: "",
+                        abzugMasseur = zeile.getOrNull(masseurIdx) ?: "",
+                        rohWerte = zeile
+                    )
+                )
+            }
+        }
+
+        return KostenSpielbetriebDaten(monat, werte, spielerListe)
     }
 
     private suspend fun leseRohWerte(spreadsheetId: String, range: String): List<List<String>> {

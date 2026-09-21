@@ -20,24 +20,31 @@ restliche Felder in Firestore.
 
 ## ⚠️ Wichtige Annahmen – bitte prüfen
 
-Ich hatte keinen Lesezugriff auf die drei verlinkten Google Sheets (401 beim
-Abruf, da nicht öffentlich freigegeben) und konnte den Aufbau daher nicht
-direkt einsehen. Folgende Annahmen stecken im Code, sind aber **alle in der
-App unter „Einstellungen" ohne Neubau änderbar**:
+Ich hatte keinen Lesezugriff auf die drei verlinkten Google Sheets und konnte
+den Aufbau daher nicht direkt einsehen – die folgenden Punkte basieren auf
+deinen Beschreibungen und Screenshots. **Alle Spaltenbuchstaben sind in der
+App unter „Einstellungen" ohne Neubau änderbar:**
 
 - Beide Tabellen (Trainingsliste, Kosten Spielbetrieb) haben **pro Monat ein
-  eigenes Tabellenblatt** (Tab), z.B. „Juli". Der Monats-Dropdown in der App
-  zeigt genau diese Tab-Namen.
-- Spaltenzuordnung in „Kosten Spielbetrieb": Name = Spalte A, Fixum = Spalte B,
-  Punkte = Spalte C *(nicht explizit angegeben, geschätzt anhand des
-  Screenshots – bitte in den Einstellungen korrigieren)*, Abzug Sonstiges =
-  Spalte I, Abzug Masseur = Spalte J.
-- In der Trainingsliste gilt die Zeile **vor** der "ENDE"-Markierung in
-  Spalte A als letzte Datenzeile; die "ENDE"-Zeile selbst wird nicht
-  angezeigt.
+  eigenes Tabellenblatt** (Tab), z.B. „Juli 2026". Der gemeinsame
+  Monats-Dropdown zeigt nur Tab-Namen, die in **beiden** Tabellen existieren
+  (Schnittmenge) – rein interne Tabs wie „GESAMT" fallen damit automatisch raus.
+- Trainingsliste: letzte Datenzeile ist die Zeile **vor** „Masseur Ersatz" in
+  Spalte A; diese Zeile selbst wird nicht angezeigt.
+- Kosten Spielbetrieb: Name = Spalte A, Fixkosten = Spalte B, AP = Spalte C,
+  Punkte = Spalte D, Abzug Sonstiges = Spalte I, Abzug Masseur = Spalte J,
+  Punkte-Multiplikator = Spalte O (Punkte-Betrag in Ebene 3 = Punkte ×
+  Punkte-Multiplikator).
+- Die Detail-Spielertabelle in „Kosten Spielbetrieb" wird automatisch anhand
+  der Kopfzeile erkannt, deren erste Zelle „Name" und zweite Zelle „Fixkosten"
+  enthält (mindestens 5 befüllte Spalten, um sie von einem kleineren
+  „Name/Fixkosten/Bemerkung"-Block weiter oben im Sheet zu unterscheiden).
+  Komplett leere Zeilen werden als optischer Leerraum dargestellt.
 
 Falls eine dieser Annahmen nicht stimmt: **Einstellungen → Spaltenzuordnung**
-in der App anpassen, keine Codeänderung nötig.
+in der App anpassen, keine Codeänderung nötig – außer bei der
+Header-Erkennung in „Kosten Spielbetrieb" (dafür bitte kurz melden, welche
+Zeile/Spalte nicht richtig erkannt wird).
 
 ## ⚠️ Nicht selbst kompiliert / deployt
 

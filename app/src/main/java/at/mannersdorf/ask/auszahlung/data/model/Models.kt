@@ -16,27 +16,37 @@ data class TrainingslisteDaten(
 )
 
 /**
- * Eine Spieler-Zeile aus der Tabelle "Kosten Spielbetrieb" (Ebene 2 / Basis für Ebene 3).
+ * Eine Spieler-Zeile aus der Tabelle "Kosten Spielbetrieb" (Basis für Ebene 3 "Spieler").
+ * fixum = Spalte B ("Fixkosten"), ap = Spalte C ("AP"), punkte = Spalte D ("Punkte", roh -
+ * für die Kopfzeilen-Anzeige), punkteMultiplikator = Spalte O (für die Punkte-Berechnung
+ * in Ebene 3: Punkte-Betrag = punkte * punkteMultiplikator).
  */
 data class SpielerKosten(
     val zeilenNummer: Int,
     val name: String,
     val fixum: String,
+    val ap: String,
     val punkte: String,
+    val punkteMultiplikator: String,
     val abzugSonstiges: String,
     val abzugMasseur: String,
     val rohWerte: List<String>
 )
 
+/**
+ * rohZeilen enthält die komplette, unveränderte Rohtabelle (für die optisch an das
+ * Google Sheet angelehnte Anzeige in Ebene 2), spieler die daraus geparste Spielerliste
+ * (für Ebene 3). Beides stammt aus demselben Tabellenblatt.
+ */
 data class KostenSpielbetriebDaten(
     val monat: String,
-    val kopfzeile: List<String>,
+    val rohZeilen: List<List<String>>,
     val spieler: List<SpielerKosten>
 )
 
 /**
- * Eine fertig unterschriebene Auszahlungsbestätigung, wie sie an den Sync-Server
- * übertragen wird, wenn "Daten übernehmen" gedrückt wird.
+ * Eine fertig unterschriebene Auszahlungsbestätigung, wie sie in Firebase gespeichert wird,
+ * wenn "Daten übernehmen" gedrückt wird.
  */
 data class Auszahlungsbestaetigung(
     val monat: String,
@@ -58,7 +68,9 @@ data class Auszahlungsbestaetigung(
 data class SpaltenZuordnung(
     val nameSpalte: String = "A",
     val fixumSpalte: String = "B",
-    val punkteSpalte: String = "C",
+    val apSpalte: String = "C",
+    val punkteSpalte: String = "D",
+    val punkteMultiplikatorSpalte: String = "O",
     val abzugSonstigesSpalte: String = "I",
     val abzugMasseurSpalte: String = "J"
 )

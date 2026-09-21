@@ -20,6 +20,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,7 +29,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import at.mannersdorf.ask.auszahlung.ui.theme.VereinsGruen
 import at.mannersdorf.ask.auszahlung.viewmodel.Ebene
 import at.mannersdorf.ask.auszahlung.viewmodel.MainViewModel
 
@@ -41,7 +46,21 @@ fun MainScreen(viewModel: MainViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (zeigeEinstellungen) "Einstellungen" else "ASK Auszahlung") },
+                title = {
+                    Text(
+                        if (zeigeEinstellungen) "EINSTELLUNGEN" else "ASK MANNERSDORF AUSZAHLUNG",
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = VereinsGruen,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White,
+                    actionIconContentColor = Color.White
+                ),
                 navigationIcon = {
                     if (zeigeEinstellungen) {
                         IconButton(onClick = { zeigeEinstellungen = false }) {
@@ -60,6 +79,8 @@ fun MainScreen(viewModel: MainViewModel) {
         }
     ) { innenAbstand ->
         Box(Modifier.padding(innenAbstand).fillMaxSize()) {
+            FussballplatzHintergrund(Modifier.fillMaxSize())
+
             when {
                 zeigeEinstellungen -> {
                     SettingsScreen(

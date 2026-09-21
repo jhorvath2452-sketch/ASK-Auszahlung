@@ -42,7 +42,9 @@ fun SettingsScreen(
 
     var nameSpalte by remember { mutableStateOf(spaltenZuordnung.nameSpalte) }
     var fixumSpalte by remember { mutableStateOf(spaltenZuordnung.fixumSpalte) }
+    var apSpalte by remember { mutableStateOf(spaltenZuordnung.apSpalte) }
     var punkteSpalte by remember { mutableStateOf(spaltenZuordnung.punkteSpalte) }
+    var punkteMultSpalte by remember { mutableStateOf(spaltenZuordnung.punkteMultiplikatorSpalte) }
     var sonstigesSpalte by remember { mutableStateOf(spaltenZuordnung.abzugSonstigesSpalte) }
     var masseurSpalte by remember { mutableStateOf(spaltenZuordnung.abzugMasseurSpalte) }
 
@@ -62,14 +64,16 @@ fun SettingsScreen(
 
         Text("Spaltenzuordnung – Kosten Spielbetrieb", style = MaterialTheme.typography.titleMedium)
         OutlinedTextField(nameSpalte, { nameSpalte = it.uppercase() }, label = { Text("Spalte: Spielername") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(fixumSpalte, { fixumSpalte = it.uppercase() }, label = { Text("Spalte: Fixum") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(fixumSpalte, { fixumSpalte = it.uppercase() }, label = { Text("Spalte: Fixkosten") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(apSpalte, { apSpalte = it.uppercase() }, label = { Text("Spalte: AP") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(punkteSpalte, { punkteSpalte = it.uppercase() }, label = { Text("Spalte: Punkte") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(punkteMultSpalte, { punkteMultSpalte = it.uppercase() }, label = { Text("Spalte: Punkte-Multiplikator (für Punkte-Betrag)") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(sonstigesSpalte, { sonstigesSpalte = it.uppercase() }, label = { Text("Spalte: Abzug Sonstiges") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(masseurSpalte, { masseurSpalte = it.uppercase() }, label = { Text("Spalte: Abzug Masseur") }, modifier = Modifier.fillMaxWidth())
         Button(
             onClick = {
                 onSpaltenSpeichern(
-                    SpaltenZuordnung(nameSpalte, fixumSpalte, punkteSpalte, sonstigesSpalte, masseurSpalte)
+                    SpaltenZuordnung(nameSpalte, fixumSpalte, apSpalte, punkteSpalte, punkteMultSpalte, sonstigesSpalte, masseurSpalte)
                 )
             },
             modifier = Modifier.fillMaxWidth()

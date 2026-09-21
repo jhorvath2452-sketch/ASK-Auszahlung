@@ -1,0 +1,193 @@
+package at.mannersdorf.ask.auszahlung.ui
+
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import at.mannersdorf.ask.auszahlung.data.PdfErsteller
+import at.mannersdorf.ask.auszahlung.data.model.GespeicherteBestaetigung
+
+/**
+ * Ebene 4: Liste der bereits gespeicherten (unterschriebenen) Bestätigungen aus
+ * Firebase. Antippen öffnet die Details inkl. Unterschrift, von dort aus lässt
+ * sich ein PDF erzeugen und über den normalen Android-Teilen-Dialog per Mail
+ * verschicken, speichern oder in eine andere App übergeben.
+ */
+@Composable
+fun BestaetigungenScreen(
+    bestaetigungen: List<GespeicherteBestaetigung>,
+    fehler: String?,
+    onAktualisieren: () -> Unit,
+    ladeUnterschrift: suspend (String) -> ByteArray?,
+    modifier: Modifier = Modifier
+) {
+    var ausgewaehlt by remember { mutableStateOf<GespeicherteBestaetigung?>(null) }
+
+    Column(modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Bestätigungen", style = MaterialTheme.typography.titleMedium)
+            IconButton(onClick = onAktualisieren) {
+                Icon(Icons.Filled.Refresh, contentDescription = "Aktualisieren")
+            }
+        }
+
+        fehler?.let {
+            Snackbar(Modifier.padding(horizontal = 12.dp)) { Text(it) }
+        }
+
+        if (bestaetigungen.isEmpty()) {
+            Box(Modifier.fillMaxSize().padding(16.dp)) {
+                Text("Noch keine gespeicherten Bestätigungen.")
+            }
+        } else {
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(bestaetigungen, key = { it.id }) { b ->
+                    Card(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                            .clickable { ausgewaehlt = b }
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(b.spielerName, fontWeight = FontWeight.Bold)
+                            Text("Monat: ${b.monat}  ·  Betrag: € ${b.betragErhalten}")
+                            Text(
+                                b.erstelltAm,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    ausgewaehlt?.let { b ->
+        BestaetigungsDetailDialog(
+            bestaetigung = b,
+            ladeUnterschrift = ladeUnterschrift,
+            onSchliessen = { ausgewaehlt = null }
+        )
+    }
+}
+
+@Composable
+private fun BestaetigungsDetailDialog(
+    bestaetigung: GespeicherteBestaetigung,
+    ladeUnterschrift: suspend (String) -> ByteArray?,
+    onSchliessen: () -> Unit
+) {
+    val context = LocalContext.current
+    var unterschriftBytes by remember(bestaetigung.id) { mutableStateOf<ByteArray?>(null) }
+    var wirdGeladen by remember(bestaetigung.id) { mutableStateOf(true) }
+
+    LaunchedEffect(bestaetigung.id) {
+        unterschriftBytes = ladeUnterschrift(bestaetigung.unterschriftUrl)
+        wirdGeladen = false
+    }
+
+    AlertDialog(
+        onDismissRequest = onSchliessen,
+        title = { Text(bestaetigung.spielerName) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                DetailZeile("Monat", bestaetigung.monat)
+                DetailZeile("Fixum", bestaetigung.fixum)
+                DetailZeile("Punkte", bestaetigung.punkte)
+                DetailZeile("Abzug Masseur", bestaetigung.abzugMasseur)
+                DetailZeile("Abzug Sonstiges", bestaetigung.abzugSonstiges)
+                DetailZeile("Korrektur", bestaetigung.korrektur)
+                DetailZeile("Ausbezahlter Betrag", "€ ${bestaetigung.betragErhalten}")
+                if (bestaetigung.bemerkung.isNotBlank()) {
+                    DetailZeile("Bemerkung", bestaetigung.bemerkung)
+                }
+                DetailZeile("Erstellt am", bestaetigung.erstelltAm)
+
+                Spacer(Modifier.height(8.dp))
+                Text("Unterschrift:", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                when {
+                    wirdGeladen -> Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                    unterschriftBytes != null -> {
+                        val bytes = unterschriftBytes!!
+                        val bitmap = remember(bytes) { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "Unterschrift",
+                            modifier = Modifier.fillMaxWidth().height(120.dp)
+                        )
+                    }
+                    else -> Text("Unterschrift konnte nicht geladen werden.")
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val bytes = unterschriftBytes
+                val bitmap = bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+                val datei = PdfErsteller.erstellePdf(context, bestaetigung, bitmap)
+                PdfErsteller.teilePdf(
+                    context,
+                    datei,
+                    "Auszahlungsbestätigung ${bestaetigung.spielerName} ${bestaetigung.monat}"
+                )
+            }) {
+                Text("Als PDF teilen / per Mail senden")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onSchliessen) { Text("Schließen") }
+        }
+    )
+}
+
+@Composable
+private fun DetailZeile(label: String, wert: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(wert, fontWeight = FontWeight.Medium)
+    }
+}

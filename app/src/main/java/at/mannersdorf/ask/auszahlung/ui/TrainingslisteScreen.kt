@@ -93,9 +93,12 @@ fun TrainingslisteScreen(daten: TrainingslisteDaten?, modifier: Modifier = Modif
                         } else {
                             MaterialTheme.colorScheme.surface
                         }
+                        val ersteZelle = zeile.werte.firstOrNull()?.trim() ?: ""
+                        val istTrainingMatchZeile = ersteZelle.contains("Training", ignoreCase = true) &&
+                            ersteZelle.contains("Match", ignoreCase = true)
                         Row(Modifier.background(hintergrund)) {
                             zeile.werte.forEachIndexed { spaltenIndex, wert ->
-                                ZellenText(wert, istNamensSpalte = spaltenIndex == 0)
+                                ZellenText(wert, istNamensSpalte = spaltenIndex == 0, erzwingeFett = istTrainingMatchZeile)
                             }
                         }
                     }
@@ -149,8 +152,9 @@ private fun HeaderZeile(kopfzeile: List<String>) {
 }
 
 @Composable
-private fun ZellenText(wert: String, istNamensSpalte: Boolean) {
-    val hervorheben = wert.trim() in WOCHENTAGE ||
+private fun ZellenText(wert: String, istNamensSpalte: Boolean, erzwingeFett: Boolean = false) {
+    val hervorheben = erzwingeFett ||
+        wert.trim() in WOCHENTAGE ||
         wert.trim() in TRAINING_MATCH_KUERZEL ||
         DATUMS_MUSTER.containsMatchIn(wert)
 

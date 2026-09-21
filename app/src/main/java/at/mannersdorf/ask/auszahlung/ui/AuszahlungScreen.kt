@@ -2,10 +2,10 @@ package at.mannersdorf.ask.auszahlung.ui
 
 import android.graphics.BitmapFactory
 import android.util.Base64
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Draw
@@ -31,7 +32,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,11 +40,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.Image
 import at.mannersdorf.ask.auszahlung.data.model.SpielerKosten
+
+private const val KORREKTUR_MIN = -2000.0
+private const val KORREKTUR_MAX = 2000.0
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,21 +55,19 @@ fun AuszahlungScreen(
     gewaehlterSpielerName: String?,
     speichernErfolgreich: Boolean,
     onSpielerGewaehlt: (String) -> Unit,
-    onDatenUebernehmen: (bemerkung: String, betragErhalten: String, unterschriftBase64: String) -> Unit,
+    onDatenUebernehmen: (bemerkung: String, betragErhalten: String, korrektur: String, unterschriftBase64: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val spieler = spielerListe.find { it.name == gewaehlterSpielerName }
     var dropdownOffen by remember { mutableStateOf(false) }
     var bemerkung by remember(gewaehlterSpielerName) { mutableStateOf("") }
-    var ausbezahlterBetrag by remember(gewaehlterSpielerName) {
-        mutableStateOf(berechneNettoBetrag(spieler))
-    }
+    var korrektur by remember(gewaehlterSpielerName) { mutableStateOf("0") }
     var unterschriftBase64 by remember(gewaehlterSpielerName) { mutableStateOf<String?>(null) }
     var zeigeSignaturPad by remember { mutableStateOf(false) }
 
-    LaunchedEffect(spieler?.name) {
-        ausbezahlterBetrag = berechneNettoBetrag(spieler)
-    }
+    // Ausbezahlter Betrag ist nicht editierbar, sondern wird immer aus FIXUM,
+    // Punkten, Abzügen und der Korrektur berechnet.
+    val ausbezahlterBetrag = berechneAusbezahltenBetrag(spieler, korrektur)
 
     Column(
         modifier
@@ -129,9 +128,21 @@ fun AuszahlungScreen(
         Spacer(Modifier.height(16.dp))
 
         OutlinedTextField(
+            value = korrektur,
+            onValueChange = { neu -> korrektur = begrenzeKorrektur(neu) },
+            label = { Text("Korrektur (€)") },
+            supportingText = { Text("Manuelle Korrektur, -2000 bis +2000") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        OutlinedTextField(
             value = ausbezahlterBetrag,
-            onValueChange = { ausbezahlterBetrag = it },
+            onValueChange = {},
+            readOnly = true,
             label = { Text("Ausbezahlter Betrag (€)") },
+            supportingText = { Text("FIXUM + Punkte − Abzug Masseur − Abzug Sonstiges + Korrektur") },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -153,7 +164,7 @@ fun AuszahlungScreen(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(180.dp)
+                .height(260.dp)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .border(1.dp, MaterialTheme.colorScheme.outline)
                 .clickable { zeigeSignaturPad = true },
@@ -178,7 +189,7 @@ fun AuszahlungScreen(
         Button(
             enabled = unterschriftBase64 != null,
             onClick = {
-                onDatenUebernehmen(bemerkung, ausbezahlterBetrag, unterschriftBase64!!)
+                onDatenUebernehmen(bemerkung, ausbezahlterBetrag, korrektur, unterschriftBase64!!)
             },
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -214,19 +225,34 @@ private fun InfoZeile(bezeichnung: String, wert: String) {
     }
 }
 
-private fun berechneNettoBetrag(spieler: SpielerKosten?): String {
-    if (spieler == null) return ""
-    val fixum = spieler.fixum.replace(",", ".").toDoubleOrNull() ?: return spieler.fixum
-    val abzugMasseur = spieler.abzugMasseur.replace(",", ".").toDoubleOrNull() ?: 0.0
-    val abzugSonstiges = spieler.abzugSonstiges.replace(",", ".").toDoubleOrNull() ?: 0.0
-    val netto = fixum - abzugMasseur - abzugSonstiges
-    return String.format("%.2f", netto)
-}
-
 /** Punkte-Betrag = Spalte D (Punkte) × Spalte O (Punkte-Multiplikator). */
 private fun berechnePunkteBetrag(spieler: SpielerKosten): String {
     val punkte = spieler.punkte.replace(",", ".").toDoubleOrNull()
     val multiplikator = spieler.punkteMultiplikator.replace(",", ".").toDoubleOrNull()
     if (punkte == null || multiplikator == null) return spieler.punkte
     return String.format("%.2f", punkte * multiplikator)
+}
+
+/** Ausbezahlter Betrag = FIXUM + Punkte − Abzug Masseur − Abzug Sonstiges + Korrektur. */
+private fun berechneAusbezahltenBetrag(spieler: SpielerKosten?, korrekturText: String): String {
+    if (spieler == null) return ""
+    val fixum = spieler.fixum.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val punkte = spieler.punkte.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val multiplikator = spieler.punkteMultiplikator.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val punkteBetrag = punkte * multiplikator
+    val abzugMasseur = spieler.abzugMasseur.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val abzugSonstiges = spieler.abzugSonstiges.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val korrektur = korrekturText.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val summe = fixum + punkteBetrag - abzugMasseur - abzugSonstiges + korrektur
+    return String.format("%.2f", summe)
+}
+
+/** Begrenzt die Korrektur-Eingabe auf -2000 bis +2000, erlaubt aber Zwischenzustände beim Tippen. */
+private fun begrenzeKorrektur(eingabe: String): String {
+    val zahl = eingabe.replace(",", ".").toDoubleOrNull() ?: return eingabe
+    return when {
+        zahl > KORREKTUR_MAX -> KORREKTUR_MAX.toInt().toString()
+        zahl < KORREKTUR_MIN -> KORREKTUR_MIN.toInt().toString()
+        else -> eingabe
+    }
 }

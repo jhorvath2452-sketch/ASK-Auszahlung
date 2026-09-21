@@ -27,11 +27,15 @@ class SheetsRepository {
 
     /**
      * Ebene 1: Trainingsliste für einen Monat (Tab-Namen), Spalten A:AM.
+     * Führende Bannerzeilen (z.B. eine sheet-interne Titelzeile wie
+     * "TRAININGSLISTE - JULI 2026" mit nur einer befüllten Zelle) werden
+     * übersprungen, bis die echte Kopfzeile mit mehreren Spaltentiteln kommt.
      * Letzte Datenzeile ist die Zeile VOR der Zeile "Masseur Ersatz" in Spalte A
      * (diese Markierungszeile selbst wird nicht angezeigt).
      */
     suspend fun leseTrainingsliste(spreadsheetId: String, monat: String): TrainingslisteDaten {
-        val werte = leseRohWerte(spreadsheetId, "'$monat'!A1:AM1000")
+        val rohWerte = leseRohWerte(spreadsheetId, "'$monat'!A1:AM1000")
+        val werte = rohWerte.dropWhile { zeile -> zeile.count { it.isNotBlank() } <= 1 }
         if (werte.isEmpty()) return TrainingslisteDaten(monat, emptyList(), emptyList())
 
         val kopfzeile = werte[0]

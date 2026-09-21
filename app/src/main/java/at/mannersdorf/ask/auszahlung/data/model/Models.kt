@@ -55,6 +55,7 @@ data class Auszahlungsbestaetigung(
     val punkte: String,
     val abzugSonstiges: String,
     val abzugMasseur: String,
+    val korrektur: String,
     val bemerkung: String,
     val betragErhalten: String,
     val unterschriftPngBase64: String,
@@ -73,4 +74,23 @@ data class SpaltenZuordnung(
     val punkteMultiplikatorSpalte: String = "O",
     val abzugSonstigesSpalte: String = "I",
     val abzugMasseurSpalte: String = "J"
+)
+
+/**
+ * Ebene 4 ("Bestätigungen"): eine aus Firestore geladene, bereits gespeicherte
+ * Auszahlungsbestätigung, zum Ansehen/Exportieren als PDF bzw. Teilen per Mail.
+ */
+data class GespeicherteBestaetigung(
+    val id: String,
+    val monat: String,
+    val spielerName: String,
+    val fixum: String,
+    val punkte: String,
+    val abzugSonstiges: String,
+    val abzugMasseur: String,
+    val korrektur: String,
+    val bemerkung: String,
+    val betragErhalten: String,
+    val unterschriftUrl: String,
+    val erstelltAm: String
 )

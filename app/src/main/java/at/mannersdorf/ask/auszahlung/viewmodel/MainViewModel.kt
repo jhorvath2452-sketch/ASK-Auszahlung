@@ -8,6 +8,7 @@ import at.mannersdorf.ask.auszahlung.data.FirebaseRepository
 import at.mannersdorf.ask.auszahlung.data.SettingsStore
 import at.mannersdorf.ask.auszahlung.data.SheetsRepository
 import at.mannersdorf.ask.auszahlung.data.model.Auszahlungsbestaetigung
+import at.mannersdorf.ask.auszahlung.data.model.GespeicherteBestaetigung
 import at.mannersdorf.ask.auszahlung.data.model.KostenSpielbetriebDaten
 import at.mannersdorf.ask.auszahlung.data.model.SpaltenZuordnung
 import at.mannersdorf.ask.auszahlung.data.model.TrainingslisteDaten
@@ -19,7 +20,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class Ebene { TRAININGSLISTE, KOSTEN_SPIELBETRIEB, SPIELER }
+enum class Ebene { TRAININGSLISTE, KOSTEN_SPIELBETRIEB, SPIELER, BESTAETIGUNGEN }
 
 data class HauptZustand(
     /** true, sobald die anonyme Firebase-Anmeldung + der erste Datenabruf durch sind. */
@@ -44,7 +45,11 @@ data class HauptZustand(
     val trainingslisteSheetId: String = "",
     val kostenSpielbetriebSheetId: String = "",
     val bestaetigungSheetId: String = "",
-    val spaltenZuordnung: SpaltenZuordnung = SpaltenZuordnung()
+    val spaltenZuordnung: SpaltenZuordnung = SpaltenZuordnung(),
+
+    // Ebene 4: bereits gespeicherte Bestätigungen (aus Firestore).
+    val bestaetigungen: List<GespeicherteBestaetigung> = emptyList(),
+    val bestaetigungenLadenFehler: String? = null
 )
 
 /**
@@ -86,7 +91,27 @@ class MainViewModel(private val context: Context) : ViewModel() {
 
     fun wechsleEbene(ebene: Ebene) {
         _zustand.value = _zustand.value.copy(aktiveEbene = ebene)
+        if (ebene == Ebene.BESTAETIGUNGEN && _zustand.value.bestaetigungen.isEmpty()) {
+            ladeBestaetigungen()
+        }
     }
+
+    fun ladeBestaetigungen() {
+        viewModelScope.launch {
+            setLaden(true)
+            val ergebnis = firebaseRepository.leseBestaetigungen()
+            ergebnis.onSuccess { liste ->
+                _zustand.value = _zustand.value.copy(bestaetigungen = liste, bestaetigungenLadenFehler = null)
+            }.onFailure {
+                _zustand.value = _zustand.value.copy(bestaetigungenLadenFehler = "Bestätigungen konnten nicht geladen werden: ${it.message}")
+            }
+            setLaden(false)
+        }
+    }
+
+    /** Für Ebene 4: lädt die Unterschrift-PNG-Bytes einer gespeicherten Bestätigung bei Bedarf. */
+    suspend fun ladeUnterschriftBytes(unterschriftUrl: String): ByteArray? =
+        firebaseRepository.leseUnterschriftBytes(unterschriftUrl).getOrNull()
 
     /**
      * Lädt die Tab-Listen BEIDER Tabellen und bildet die Schnittmenge: nur
@@ -186,6 +211,7 @@ class MainViewModel(private val context: Context) : ViewModel() {
     fun speichereAuszahlung(
         bemerkung: String,
         betragErhalten: String,
+        korrektur: String,
         unterschriftPngBase64: String
     ) {
         val z = _zustand.value
@@ -199,6 +225,7 @@ class MainViewModel(private val context: Context) : ViewModel() {
             punkte = spieler.punkte,
             abzugSonstiges = spieler.abzugSonstiges,
             abzugMasseur = spieler.abzugMasseur,
+            korrektur = korrektur,
             bemerkung = bemerkung.take(250),
             betragErhalten = betragErhalten,
             unterschriftPngBase64 = unterschriftPngBase64,
@@ -209,7 +236,7 @@ class MainViewModel(private val context: Context) : ViewModel() {
             setLaden(true)
             val ergebnis = firebaseRepository.speichereBestaetigung(bestaetigung)
             ergebnis.onSuccess {
-                _zustand.value = _zustand.value.copy(speichernErfolgreich = true, fehler = null)
+                _zustand.value = _zustand.value.copy(speichernErfolgreich = true, fehler = null, bestaetigungen = emptyList())
             }.onFailure {
                 _zustand.value = _zustand.value.copy(fehler = "Speichern fehlgeschlagen: ${it.message}")
             }

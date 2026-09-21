@@ -160,11 +160,10 @@ Installation aus unbekannten Quellen erlauben, installieren.
 
 ## Mögliche Erweiterungen (nicht umgesetzt)
 
-- PDF-Export der einzelnen Bestätigung (z.B. zum Ausdrucken oder Mailen)
 - Automatisches Zurückschreiben der Bestätigung in das "Bestätigung"-Sheet
+  (bewusst nicht umgesetzt – es wird grundsätzlich nichts in die Google
+  Sheets zurückgeschrieben, nur daraus gelesen)
 - Offline-Zwischenspeicherung, falls kein Netz beim Abzeichnen verfügbar ist
-- Übersicht/Historie bereits bestätigter Auszahlungen direkt in der App
-  (aktuell nur über die Firebase-Konsole einsehbar: Firestore → Sammlung
-  "auszahlungen")
 - Echter Google-Sign-In für Firebase Auth statt anonymer Anmeldung, falls
   nachvollziehbar sein soll, wer welche Bestätigung erstellt hat
+- Suche/Filter in Ebene "Bestätigungen" (aktuell die letzten 300, neueste zuerst)

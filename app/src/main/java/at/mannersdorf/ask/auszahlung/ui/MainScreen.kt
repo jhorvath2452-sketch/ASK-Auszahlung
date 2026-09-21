@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -38,10 +37,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import at.mannersdorf.ask.auszahlung.R
+import at.mannersdorf.ask.auszahlung.data.SettingsStore
 import at.mannersdorf.ask.auszahlung.ui.theme.SchreibmaschinenSchrift
 import at.mannersdorf.ask.auszahlung.ui.theme.VereinsGruen
 import at.mannersdorf.ask.auszahlung.viewmodel.Ebene
@@ -90,13 +91,34 @@ fun MainScreen(viewModel: MainViewModel) {
 
                 else -> {
                     Column(Modifier.fillMaxSize()) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SingleChoiceSegmentedButtonRow(Modifier.height(40.dp)) {
+                                SegmentedButton(
+                                    selected = zustand.trainingslisteSheetId != SettingsStore.TEST_TRAININGSLISTE_ID,
+                                    onClick = { viewModel.waehleDatensatz(test = false) },
+                                    shape = SegmentedButtonDefaults.itemShape(0, 2)
+                                ) { Text("2026-27") }
+                                SegmentedButton(
+                                    selected = zustand.trainingslisteSheetId == SettingsStore.TEST_TRAININGSLISTE_ID,
+                                    onClick = { viewModel.waehleDatensatz(test = true) },
+                                    shape = SegmentedButtonDefaults.itemShape(1, 2)
+                                ) { Text("TEST") }
+                            }
+                            if (zustand.aktiveEbene == Ebene.TRAININGSLISTE) {
+                                TrainingsInfoButton()
+                            }
+                        }
+
                         if (zustand.verfuegbareMonate.isNotEmpty()) {
                             MonatsDropdown(
                                 label = "Monat",
                                 monate = zustand.verfuegbareMonate,
                                 gewaehlterMonat = zustand.gewaehlterMonat,
                                 onMonatGewaehlt = viewModel::waehleMonat,
-                                modifier = Modifier.padding(12.dp)
+                                modifier = Modifier.padding(horizontal = 12.dp)
                             )
                         }
 
@@ -190,14 +212,18 @@ private fun AppKopfzeile(
 
             Spacer(Modifier.width(8.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
-                    if (zeigtEinstellungen) "EINSTELLUNGEN" else "ASK MANNERSDORF",
+                    if (zeigtEinstellungen) "EINSTELLUNGEN" else "ASK MANNERSDORF AUSZAHLUNG",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 44.sp,
-                    lineHeight = 46.sp,
-                    maxLines = 1,
+                    fontSize = 30.sp,
+                    lineHeight = 32.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 if (!zeigtEinstellungen) {
@@ -205,8 +231,9 @@ private fun AppKopfzeile(
                         "#manaschdooaaf",
                         color = Color.White,
                         fontFamily = SchreibmaschinenSchrift,
-                        fontSize = 36.sp,
-                        lineHeight = 38.sp,
+                        fontSize = 30.sp,
+                        lineHeight = 32.sp,
+                        textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )

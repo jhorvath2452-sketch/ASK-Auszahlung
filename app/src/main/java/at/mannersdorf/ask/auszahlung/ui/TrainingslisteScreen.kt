@@ -60,22 +60,12 @@ private val DATUMS_MUSTER = Regex("""\d{1,2}[./]\d{1,2}""")
 /** Ebene 1: zeigt die Trainingsliste (Spalte A–AM) für den gewählten Monat, wie im Google Sheet. */
 @Composable
 fun TrainingslisteScreen(daten: TrainingslisteDaten?, modifier: Modifier = Modifier) {
-    var zeigeInfo by remember { mutableStateOf(false) }
-
     Column(modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "Trainingsliste" + (daten?.let { " – ${it.monat}" } ?: ""),
-                style = MaterialTheme.typography.titleMedium
-            )
-            IconButton(onClick = { zeigeInfo = true }) {
-                Icon(Icons.Filled.Info, contentDescription = "Kürzel-Erklärung")
-            }
-        }
+        Text(
+            "Trainingsliste" + (daten?.let { " – ${it.monat}" } ?: ""),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+        )
 
         if (daten == null || daten.zeilen.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(16.dp)) {
@@ -105,6 +95,19 @@ fun TrainingslisteScreen(daten: TrainingslisteDaten?, modifier: Modifier = Modif
                 }
             }
         }
+    }
+}
+
+/**
+ * Info-Button + Kürzel-Erklärungs-Dialog für die Trainingsliste, eigenständig
+ * verwendbar (z.B. direkt neben dem Monats-Dropdown in der MainScreen).
+ */
+@Composable
+fun TrainingsInfoButton(modifier: Modifier = Modifier) {
+    var zeigeInfo by remember { mutableStateOf(false) }
+
+    IconButton(onClick = { zeigeInfo = true }, modifier = modifier) {
+        Icon(Icons.Filled.Info, contentDescription = "Kürzel-Erklärung")
     }
 
     if (zeigeInfo) {

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -41,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import at.mannersdorf.ask.auszahlung.data.formatiereDeutscheZahl
 import at.mannersdorf.ask.auszahlung.data.model.SpielerKosten
@@ -119,11 +121,12 @@ fun AuszahlungScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text("Monat: ${monat ?: "-"}", fontWeight = FontWeight.Bold)
+                Text("Punkte pro Monat: € ${formatiereDeutscheZahl(parseDeutscheZahl(spieler.punkteMultiplikator) ?: 0.0)}", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
                 InfoZeile("FIXUM", "€ ${spieler.fixum.replace("€", "").trim()}")
-                InfoZeile("Punkte pro Monat", berechnePunkteBetrag(spieler))
-                InfoZeile("Abzug Masseur", spieler.abzugMasseur)
-                InfoZeile("Abzug Sonstiges", spieler.abzugSonstiges)
+                InfoZeile("PUNKTE", berechnePunkteBetrag(spieler))
+                InfoZeile("Abzug Masseur", "€ ${spieler.abzugMasseur.replace("€", "").trim()}")
+                InfoZeile("Abzug Sonstiges", "€ ${spieler.abzugSonstiges.replace("€", "").trim()}")
             }
         }
 
@@ -134,17 +137,18 @@ fun AuszahlungScreen(
             onValueChange = { neu -> korrektur = begrenzeKorrektur(neu) },
             label = { Text("Korrektur (€)") },
             supportingText = { Text("Manuelle Korrektur, -2000 bis +2000") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(Modifier.height(16.dp))
 
         OutlinedTextField(
-            value = ausbezahlterBetrag,
+            value = "€ $ausbezahlterBetrag",
             onValueChange = {},
             readOnly = true,
-            label = { Text("Ausbezahlter Betrag (€)") },
-            supportingText = { Text("FIXUM + Punkte − Abzug Masseur − Abzug Sonstiges + Korrektur") },
+            label = { Text("Ausbezahlter Betrag") },
+            supportingText = { Text("FIXUM + PUNKTE − Abzug Masseur − Abzug Sonstiges + Korrektur") },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -227,21 +231,20 @@ private fun InfoZeile(bezeichnung: String, wert: String) {
     }
 }
 
-/** Punkte pro Monat = Spalte D (Punkte) × Spalte O (Punkte-Multiplikator). */
+/** PUNKTE-Betrag = Spalte O ("Punkte pro Monat") × FIXUM (Spalte B). */
 private fun berechnePunkteBetrag(spieler: SpielerKosten): String {
-    val punkte = parseDeutscheZahl(spieler.punkte)
-    val multiplikator = parseDeutscheZahl(spieler.punkteMultiplikator)
-    if (punkte == null || multiplikator == null) return spieler.punkte
-    return "€ " + formatiereDeutscheZahl(punkte * multiplikator)
+    val punkteProMonat = parseDeutscheZahl(spieler.punkteMultiplikator)
+    val fixum = parseDeutscheZahl(spieler.fixum)
+    if (punkteProMonat == null || fixum == null) return spieler.punkteMultiplikator
+    return "€ " + formatiereDeutscheZahl(punkteProMonat * fixum)
 }
 
-/** Ausbezahlter Betrag = FIXUM + Punkte pro Monat − Abzug Masseur − Abzug Sonstiges + Korrektur. */
+/** Ausbezahlter Betrag = FIXUM + PUNKTE − Abzug Masseur − Abzug Sonstiges + Korrektur. */
 private fun berechneAusbezahltenBetrag(spieler: SpielerKosten?, korrekturText: String): String {
     if (spieler == null) return ""
     val fixum = parseDeutscheZahl(spieler.fixum) ?: 0.0
-    val punkte = parseDeutscheZahl(spieler.punkte) ?: 0.0
-    val multiplikator = parseDeutscheZahl(spieler.punkteMultiplikator) ?: 0.0
-    val punkteBetrag = punkte * multiplikator
+    val punkteProMonat = parseDeutscheZahl(spieler.punkteMultiplikator) ?: 0.0
+    val punkteBetrag = punkteProMonat * fixum
     val abzugMasseur = parseDeutscheZahl(spieler.abzugMasseur) ?: 0.0
     val abzugSonstiges = parseDeutscheZahl(spieler.abzugSonstiges) ?: 0.0
     val korrektur = parseDeutscheZahl(korrekturText) ?: 0.0

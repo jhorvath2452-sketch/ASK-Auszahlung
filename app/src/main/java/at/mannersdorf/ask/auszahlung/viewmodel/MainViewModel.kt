@@ -208,6 +208,23 @@ class MainViewModel(private val context: Context) : ViewModel() {
         }
     }
 
+    /** Wechselt zwischen den Produktiv-Tabellen ("2026-27") und den TEST-Tabellen. */
+    fun waehleDatensatz(test: Boolean) {
+        if (test) {
+            setSheetIds(
+                SettingsStore.TEST_TRAININGSLISTE_ID,
+                SettingsStore.TEST_KOSTEN_SPIELBETRIEB_ID,
+                _zustand.value.bestaetigungSheetId
+            )
+        } else {
+            setSheetIds(
+                SettingsStore.STANDARD_TRAININGSLISTE_ID,
+                SettingsStore.STANDARD_KOSTEN_SPIELBETRIEB_ID,
+                _zustand.value.bestaetigungSheetId
+            )
+        }
+    }
+
     fun speichereAuszahlung(
         bemerkung: String,
         betragErhalten: String,

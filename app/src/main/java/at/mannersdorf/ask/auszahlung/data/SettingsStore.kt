@@ -33,11 +33,15 @@ class SettingsStore(private val context: Context) {
         val SPALTE_ABZUG_MASSEUR = stringPreferencesKey("spalte_abzug_masseur")
     }
 
-    // Standardwerte = die drei vom Verein bereits genutzten Google Sheets.
+    // Standardwerte = die drei vom Verein bereits genutzten Google Sheets ("2026-27").
     companion object {
         const val STANDARD_TRAININGSLISTE_ID = "1Nl5F1yldZqP4ynr95D9v_6V_NGT6fZOxF9JSxt0jDdM"
         const val STANDARD_KOSTEN_SPIELBETRIEB_ID = "1dXEs3xbxmoxiPMXPJImKOXe95A46MyiFEjzlMZsUAD0"
         const val STANDARD_BESTAETIGUNG_ID = "10oE94grUj815c9CZfBzf8bvb27hENpk3JKOm8REUlyg"
+
+        // TEST-Tabellen, zwischen denen in der App umgeschaltet werden kann.
+        const val TEST_TRAININGSLISTE_ID = "1NusC2oNH_-iEAmWvOGi_a0R10qRY6FU6BrYDSWUltW8"
+        const val TEST_KOSTEN_SPIELBETRIEB_ID = "1vMxCVmezteoAYMAjz-hFNpMbW3SiYC3FMZ39E3oLSiE"
     }
 
     val trainingslisteSheetId: Flow<String> = context.dataStore.data

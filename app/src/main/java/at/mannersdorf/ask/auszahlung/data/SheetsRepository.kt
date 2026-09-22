@@ -74,6 +74,8 @@ class SheetsRepository {
         val punkteMultIdx = spaltenBuchstabeZuIndex(spalten.punkteMultiplikatorSpalte)
         val sonstigesIdx = spaltenBuchstabeZuIndex(spalten.abzugSonstigesSpalte)
         val masseurIdx = spaltenBuchstabeZuIndex(spalten.abzugMasseurSpalte)
+        val einsaetzeIdx = spaltenBuchstabeZuIndex(spalten.einsaetzeSpalte)
+        val trainingsgeldFaktorIdx = spaltenBuchstabeZuIndex(spalten.trainingsgeldFaktorSpalte)
 
         // Start der Detail-Spielertabelle finden (zweite "Name/Fixkosten"-Kopfzeile).
         var startZeile = -1
@@ -108,6 +110,8 @@ class SheetsRepository {
                         punkteMultiplikator = zeile.getOrNull(punkteMultIdx) ?: "",
                         abzugSonstiges = zeile.getOrNull(sonstigesIdx) ?: "",
                         abzugMasseur = zeile.getOrNull(masseurIdx) ?: "",
+                        einsaetze = zeile.getOrNull(einsaetzeIdx) ?: "",
+                        trainingsgeldFaktor = zeile.getOrNull(trainingsgeldFaktorIdx) ?: "",
                         rohWerte = zeile
                     )
                 )

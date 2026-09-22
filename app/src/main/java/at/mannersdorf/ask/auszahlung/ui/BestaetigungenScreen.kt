@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +26,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,10 +45,21 @@ import androidx.compose.ui.unit.dp
 import at.mannersdorf.ask.auszahlung.data.PdfErsteller
 import at.mannersdorf.ask.auszahlung.data.model.GespeicherteBestaetigung
 
+private const val ALLE_FILTER = "Alle"
+
+private fun jahrAusMonat(monat: String): String =
+    Regex("(20\\d{2})").find(monat)?.value ?: ALLE_FILTER
+
+private fun monatsNameOhneJahr(monat: String): String {
+    val ohneJahr = monat.replace(Regex("20\\d{2}"), "").trim()
+    return ohneJahr.ifBlank { monat }
+}
+
 /**
  * Ebene 4: Liste der bereits gespeicherten (unterschriebenen) Bestätigungen aus
- * Firebase. Antippen öffnet die Details inkl. Unterschrift, von dort aus lässt
- * sich ein PDF erzeugen und über den normalen Android-Teilen-Dialog per Mail
+ * Firebase. Nach Name, Jahr und Monat einzeln oder kombiniert filterbar.
+ * Antippen öffnet die Details inkl. Unterschrift, von dort aus lässt sich ein
+ * PDF erzeugen und über den normalen Android-Teilen-Dialog per Mail
  * verschicken, speichern oder in eine andere App übergeben.
  */
 @Composable
@@ -58,6 +71,22 @@ fun BestaetigungenScreen(
     modifier: Modifier = Modifier
 ) {
     var ausgewaehlt by remember { mutableStateOf<GespeicherteBestaetigung?>(null) }
+    var nameFilter by remember { mutableStateOf("") }
+    var jahrFilter by remember { mutableStateOf(ALLE_FILTER) }
+    var monatFilter by remember { mutableStateOf(ALLE_FILTER) }
+
+    val verfuegbareJahre = remember(bestaetigungen) {
+        listOf(ALLE_FILTER) + bestaetigungen.map { jahrAusMonat(it.monat) }.distinct().sorted()
+    }
+    val verfuegbareMonate = remember(bestaetigungen) {
+        listOf(ALLE_FILTER) + bestaetigungen.map { monatsNameOhneJahr(it.monat) }.distinct().sorted()
+    }
+
+    val gefilterteListe = bestaetigungen.filter { b ->
+        (nameFilter.isBlank() || b.spielerName.contains(nameFilter, ignoreCase = true)) &&
+            (jahrFilter == ALLE_FILTER || jahrAusMonat(b.monat) == jahrFilter) &&
+            (monatFilter == ALLE_FILTER || monatsNameOhneJahr(b.monat) == monatFilter)
+    }
 
     Column(modifier.fillMaxSize()) {
         Row(
@@ -71,17 +100,45 @@ fun BestaetigungenScreen(
             }
         }
 
+        OutlinedTextField(
+            value = nameFilter,
+            onValueChange = { nameFilter = it },
+            label = { Text("Nach Name filtern") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+        )
+        Spacer(Modifier.height(4.dp))
+        Row(Modifier.padding(horizontal = 12.dp)) {
+            MonatsDropdown(
+                label = "Jahr",
+                monate = verfuegbareJahre,
+                gewaehlterMonat = jahrFilter,
+                onMonatGewaehlt = { jahrFilter = it },
+                modifier = Modifier.weight(1f).padding(end = 4.dp)
+            )
+            MonatsDropdown(
+                label = "Monat",
+                monate = verfuegbareMonate,
+                gewaehlterMonat = monatFilter,
+                onMonatGewaehlt = { monatFilter = it },
+                modifier = Modifier.weight(1f).padding(start = 4.dp)
+            )
+        }
+
         fehler?.let {
             Snackbar(Modifier.padding(horizontal = 12.dp)) { Text(it) }
         }
 
-        if (bestaetigungen.isEmpty()) {
+        if (gefilterteListe.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(16.dp)) {
-                Text("Noch keine gespeicherten Bestätigungen.")
+                Text(
+                    if (bestaetigungen.isEmpty()) "Noch keine gespeicherten Bestätigungen."
+                    else "Keine Bestätigungen für diesen Filter gefunden."
+                )
             }
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
-                items(bestaetigungen, key = { it.id }) { b ->
+                items(gefilterteListe, key = { it.id }) { b ->
                     Card(
                         Modifier
                             .fillMaxWidth()

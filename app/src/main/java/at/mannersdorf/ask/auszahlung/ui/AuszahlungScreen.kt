@@ -114,8 +114,9 @@ fun AuszahlungScreen(
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
+                val istAp = istApSpieler(spieler)
                 Text(
-                    "${spieler.name}  (Fixkosten: ${spieler.fixum}  |  AP: ${spieler.ap}  |  Punkte: ${spieler.punkte})",
+                    "${spieler.name}  (${if (istAp) "Trainingsgeld" else "Fixkosten"}: ${spieler.fixum}  |  AP: ${spieler.ap}  |  Punkte: ${spieler.punkte})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -125,9 +126,18 @@ fun AuszahlungScreen(
                     "Punkte pro Monat: " + zeigeWertOderRoh(spieler.punkteMultiplikator),
                     fontWeight = FontWeight.Bold
                 )
+                if (istAp) {
+                    Text(
+                        "Einsätze pro Monat: " + zeigeWertOderRoh(spieler.einsaetze),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
-                InfoZeile("FIXUM", "€ ${spieler.fixum.replace("€", "").trim()}")
-                InfoZeile("PUNKTE", berechnePunkteBetrag(spieler))
+                InfoZeile(
+                    if (istAp) "TRAININGSGELD" else "FIXUM",
+                    "€ " + formatiereDeutscheZahl(berechneBasisBetrag(spieler))
+                )
+                InfoZeile("PUNKTE / AUFLAUFPRÄMIE", "€ " + formatiereDeutscheZahl(berechneBonusBetrag(spieler)))
                 InfoZeile("Abzug Masseur", "€ ${spieler.abzugMasseur.replace("€", "").trim()}")
                 InfoZeile("Abzug Sonstiges", "€ ${spieler.abzugSonstiges.replace("€", "").trim()}")
             }
@@ -151,7 +161,7 @@ fun AuszahlungScreen(
             onValueChange = {},
             readOnly = true,
             label = { Text("Ausbezahlter Betrag") },
-            supportingText = { Text("FIXUM + PUNKTE − Abzug Masseur − Abzug Sonstiges + Korrektur") },
+            supportingText = { Text("FIXUM/TRAININGSGELD + PUNKTE/AUFLAUFPRÄMIE − Abzug Masseur − Abzug Sonstiges + Korrektur") },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -234,12 +244,36 @@ private fun InfoZeile(bezeichnung: String, wert: String) {
     }
 }
 
-/** PUNKTE-Betrag = Spalte D ("Punkte") × Spalte O ("Punkte pro Monat"). */
-private fun berechnePunkteBetrag(spieler: SpielerKosten): String {
-    val punkte = parseDeutscheZahl(spieler.punkte)
-    val punkteProMonat = parseDeutscheZahl(spieler.punkteMultiplikator)
-    if (punkte == null || punkteProMonat == null) return spieler.punkteMultiplikator
-    return "€ " + formatiereDeutscheZahl(punkte * punkteProMonat)
+/** Ein Spieler gilt als AP-Spieler ("Auflaufprämie"), wenn sein Name "(AP)" enthält. */
+private fun istApSpieler(spieler: SpielerKosten): Boolean =
+    spieler.name.contains("(AP)", ignoreCase = true)
+
+/**
+ * Basis-Betrag: normal FIXUM (roh, Spalte B), bei AP-Spielern stattdessen
+ * Trainingsgeld = Spalte B × Spalte L.
+ */
+private fun berechneBasisBetrag(spieler: SpielerKosten): Double {
+    val fixum = parseDeutscheZahl(spieler.fixum) ?: 0.0
+    if (!istApSpieler(spieler)) return fixum
+    val faktor = parseDeutscheZahl(spieler.trainingsgeldFaktor) ?: 0.0
+    return fixum * faktor
+}
+
+/**
+ * Bonus-Betrag: normal Punkte-Betrag = Spalte D ("Punkte") × Spalte O ("Punkte pro
+ * Monat"), bei AP-Spielern stattdessen Auflaufprämie = Spalte C ("AP") × Spalte N
+ * ("Einsätze pro Monat").
+ */
+private fun berechneBonusBetrag(spieler: SpielerKosten): Double {
+    return if (istApSpieler(spieler)) {
+        val ap = parseDeutscheZahl(spieler.ap) ?: 0.0
+        val einsaetze = parseDeutscheZahl(spieler.einsaetze) ?: 0.0
+        ap * einsaetze
+    } else {
+        val punkte = parseDeutscheZahl(spieler.punkte) ?: 0.0
+        val punkteProMonat = parseDeutscheZahl(spieler.punkteMultiplikator) ?: 0.0
+        punkte * punkteProMonat
+    }
 }
 
 /**
@@ -253,17 +287,15 @@ private fun zeigeWertOderRoh(rohwert: String): String {
     return if (zahl != null) "€ " + formatiereDeutscheZahl(zahl) else "(Rohwert: \"$rohwert\")"
 }
 
-/** Ausbezahlter Betrag = FIXUM + PUNKTE − Abzug Masseur − Abzug Sonstiges + Korrektur. */
+/** Ausbezahlter Betrag = Basis-Betrag + Bonus-Betrag − Abzug Masseur − Abzug Sonstiges + Korrektur. */
 private fun berechneAusbezahltenBetrag(spieler: SpielerKosten?, korrekturText: String): String {
     if (spieler == null) return ""
-    val fixum = parseDeutscheZahl(spieler.fixum) ?: 0.0
-    val punkte = parseDeutscheZahl(spieler.punkte) ?: 0.0
-    val punkteProMonat = parseDeutscheZahl(spieler.punkteMultiplikator) ?: 0.0
-    val punkteBetrag = punkte * punkteProMonat
+    val basis = berechneBasisBetrag(spieler)
+    val bonus = berechneBonusBetrag(spieler)
     val abzugMasseur = parseDeutscheZahl(spieler.abzugMasseur) ?: 0.0
     val abzugSonstiges = parseDeutscheZahl(spieler.abzugSonstiges) ?: 0.0
     val korrektur = parseDeutscheZahl(korrekturText) ?: 0.0
-    val summe = fixum + punkteBetrag - abzugMasseur - abzugSonstiges + korrektur
+    val summe = basis + bonus - abzugMasseur - abzugSonstiges + korrektur
     return formatiereDeutscheZahl(summe)
 }
 

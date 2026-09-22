@@ -47,6 +47,8 @@ fun SettingsScreen(
     var punkteMultSpalte by remember { mutableStateOf(spaltenZuordnung.punkteMultiplikatorSpalte) }
     var sonstigesSpalte by remember { mutableStateOf(spaltenZuordnung.abzugSonstigesSpalte) }
     var masseurSpalte by remember { mutableStateOf(spaltenZuordnung.abzugMasseurSpalte) }
+    var einsaetzeSpalte by remember { mutableStateOf(spaltenZuordnung.einsaetzeSpalte) }
+    var trainingsgeldFaktorSpalte by remember { mutableStateOf(spaltenZuordnung.trainingsgeldFaktorSpalte) }
 
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -70,10 +72,15 @@ fun SettingsScreen(
         OutlinedTextField(punkteMultSpalte, { punkteMultSpalte = it.uppercase() }, label = { Text("Spalte: Punkte-Multiplikator (für Punkte-Betrag)") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(sonstigesSpalte, { sonstigesSpalte = it.uppercase() }, label = { Text("Spalte: Abzug Sonstiges") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(masseurSpalte, { masseurSpalte = it.uppercase() }, label = { Text("Spalte: Abzug Masseur") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(einsaetzeSpalte, { einsaetzeSpalte = it.uppercase() }, label = { Text("Spalte: Einsätze pro Monat (AP-Spieler)") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(trainingsgeldFaktorSpalte, { trainingsgeldFaktorSpalte = it.uppercase() }, label = { Text("Spalte: Trainingsgeld-Faktor (AP-Spieler)") }, modifier = Modifier.fillMaxWidth())
         Button(
             onClick = {
                 onSpaltenSpeichern(
-                    SpaltenZuordnung(nameSpalte, fixumSpalte, apSpalte, punkteSpalte, punkteMultSpalte, sonstigesSpalte, masseurSpalte)
+                    SpaltenZuordnung(
+                        nameSpalte, fixumSpalte, apSpalte, punkteSpalte, punkteMultSpalte,
+                        sonstigesSpalte, masseurSpalte, einsaetzeSpalte, trainingsgeldFaktorSpalte
+                    )
                 )
             },
             modifier = Modifier.fillMaxWidth()

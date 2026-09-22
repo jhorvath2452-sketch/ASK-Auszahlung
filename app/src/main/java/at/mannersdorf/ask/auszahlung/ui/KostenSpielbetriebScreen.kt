@@ -2,11 +2,13 @@ package at.mannersdorf.ask.auszahlung.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -14,9 +16,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +35,7 @@ import at.mannersdorf.ask.auszahlung.data.parseDeutscheZahl
 private val SPALTENBREITE = 108.dp
 private val NAMENSSPALTENBREITE = 168.dp
 private const val SUMMENZEILEN_MARKIERUNG = "SUMME"
+private val MarkierGelb = Color(0xFFFFF59D)
 
 // Feste Spalten für die 5 Summen im Abschluss, wie im Sheet: E, F, H, I, J
 // (0-basiert: A=0, B=1, ... E=4, F=5, G=6, H=7, I=8, J=9).
@@ -37,20 +45,17 @@ private const val SUMME_SPALTE_H = 7
 private const val SUMME_SPALTE_I = 8
 private const val SUMME_SPALTE_J = 9
 private val EURO_SUMMEN_SPALTEN = setOf(SUMME_SPALTE_E, SUMME_SPALTE_F)
-private val HERVORGEHOBENE_SUMMEN_SPALTE = SUMME_SPALTE_H
-
-private val SummenzeilenBlau = Color(0xFF5C7C99)
-private val SummenzeilenGruen = Color(0xFF6FCB4C)
 
 /**
  * Ebene 2: zeigt "Kosten Spielbetrieb" optisch an das Google Sheet angelehnt.
  * Zeilen, deren erste Zelle "Name" und zweite Zelle "Fixkosten" enthält, werden
  * als dunkelgrüner Balken mit weißer, fetter Schrift dargestellt - ebenso die
  * jeweils direkt darauffolgende Zeile. Komplett leere Zeilen erzeugen einen
- * Leerraum, so wie im Sheet selbst. Nach der letzten Spielerzeile wird ein
- * Abschluss mit 5 Summen (Spalten E, F, H, I, J) eingefügt, farblich an den
- * echten Sheet-Abschluss angelehnt (Blau, mit einer hervorgehobenen grünen
- * Zelle bei Spalte H) - nur zur Anzeige, wird nicht ins Sheet zurückgeschrieben.
+ * Leerraum, so wie im Sheet selbst. "Freie Zeile"-Spielerzeilen lassen sich
+ * über einen Schalter ausblenden. Nach der letzten Spielerzeile wird ein
+ * grüner Abschluss mit 5 Summen (Spalten E, F, H, I, J) eingefügt - nur zur
+ * Anzeige, wird nicht ins Sheet zurückgeschrieben. Antippen einer Datenzeile
+ * markiert sie hellgelb (nochmals antippen hebt die Markierung wieder auf).
  */
 @Composable
 fun KostenSpielbetriebScreen(daten: KostenSpielbetriebDaten?, modifier: Modifier = Modifier) {
@@ -61,7 +66,15 @@ fun KostenSpielbetriebScreen(daten: KostenSpielbetriebDaten?, modifier: Modifier
         return
     }
 
-    val zeilenMitSumme = remember(daten) { fuegeSummenzeileEin(daten.rohZeilen) }
+    var freieZeilenAusblenden by remember { mutableStateOf(false) }
+    var markierteZeilen by remember { mutableStateOf(setOf<Int>()) }
+
+    val alleZeilen = remember(daten) { fuegeSummenzeileEin(daten.rohZeilen) }
+    val sichtbareZeilen = if (freieZeilenAusblenden) {
+        alleZeilen.filterIndexed { _, zeile -> !istFreieZeile(zeile) }
+    } else {
+        alleZeilen
+    }
 
     val scrollZustand = rememberScrollState()
     Column(modifier.fillMaxSize()) {
@@ -70,17 +83,38 @@ fun KostenSpielbetriebScreen(daten: KostenSpielbetriebDaten?, modifier: Modifier
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(12.dp)
         )
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Freie Zeilen ausblenden")
+            Switch(checked = freieZeilenAusblenden, onCheckedChange = { freieZeilenAusblenden = it })
+        }
         Column(Modifier.horizontalScroll(scrollZustand)) {
             LazyColumn {
-                items(zeilenMitSumme.size) { index ->
-                    val zeile = zeilenMitSumme[index]
-                    val vorherigeZeile = zeilenMitSumme.getOrNull(index - 1)
+                items(sichtbareZeilen.size) { index ->
+                    val zeile = sichtbareZeilen[index]
+                    val vorherigeZeile = sichtbareZeilen.getOrNull(index - 1)
+                    // Eindeutiger Schlüssel für die Markierung: Zeileninhalt selbst
+                    // (Name + Rohwerte), da es keine stabile Zeilennummer über
+                    // Filterung hinweg gibt.
+                    val zeilenSchluessel = zeile.hashCode()
                     when {
                         istKomplettLeer(zeile) -> Box(Modifier.height(20.dp))
                         istKopfzeile(zeile) -> KopfzeilenBalken(zeile)
                         vorherigeZeile != null && istKopfzeile(vorherigeZeile) -> KopfzeilenBalken(zeile)
                         istSummenzeile(zeile) -> Summenzeile(zeile)
-                        else -> DatenZeile(zeile)
+                        else -> DatenZeile(
+                            zeile = zeile,
+                            markiert = zeilenSchluessel in markierteZeilen,
+                            onKlick = {
+                                markierteZeilen = if (zeilenSchluessel in markierteZeilen) {
+                                    markierteZeilen - zeilenSchluessel
+                                } else {
+                                    markierteZeilen + zeilenSchluessel
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -98,6 +132,9 @@ private fun istKopfzeile(zeile: List<String>): Boolean {
 
 private fun istSummenzeile(zeile: List<String>): Boolean =
     zeile.getOrNull(0)?.trim() == SUMMENZEILEN_MARKIERUNG
+
+private fun istFreieZeile(zeile: List<String>): Boolean =
+    zeile.getOrNull(0)?.contains("freie Zeile", ignoreCase = true) == true
 
 /**
  * Sucht die große Detail-Kopfzeile (Name/Fixkosten/…) und summiert die Spalten
@@ -167,8 +204,12 @@ private fun KopfzeilenBalken(zeile: List<String>) {
 }
 
 @Composable
-private fun DatenZeile(zeile: List<String>) {
-    Row {
+private fun DatenZeile(zeile: List<String>, markiert: Boolean, onKlick: () -> Unit) {
+    Row(
+        Modifier
+            .background(if (markiert) MarkierGelb else Color.Transparent)
+            .clickable { onKlick() }
+    ) {
         zeile.forEachIndexed { index, wert ->
             Box(
                 Modifier
@@ -182,28 +223,24 @@ private fun DatenZeile(zeile: List<String>) {
     }
 }
 
-/** Abschlusszeile: blauer Balken, mit hervorgehobener grüner Zelle bei Spalte H. */
+/** Abschlusszeile: grüner Balken wie die Kopfzeile, alle Zahlen fett und weiß. */
 @Composable
 private fun Summenzeile(zeile: List<String>) {
-    Row(Modifier.background(SummenzeilenBlau)) {
+    Row(Modifier.background(MaterialTheme.colorScheme.primary)) {
         zeile.forEachIndexed { index, wert ->
-            val istHervorgehoben = index == HERVORGEHOBENE_SUMMEN_SPALTE
             val anzeigeText = when {
                 wert.isBlank() -> ""
                 index in EURO_SUMMEN_SPALTEN -> "$wert €"
                 else -> wert
             }
             Box(
-                Modifier
-                    .width(if (index == 0) NAMENSSPALTENBREITE else SPALTENBREITE)
-                    .background(if (istHervorgehoben) SummenzeilenGruen else Color.Transparent)
-                    .padding(6.dp)
+                Modifier.width(if (index == 0) NAMENSSPALTENBREITE else SPALTENBREITE).padding(6.dp)
             ) {
                 Text(
                     anzeigeText,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (istHervorgehoben) Color.Black else Color.White,
+                    color = Color.White,
                     maxLines = 1,
                     softWrap = false
                 )

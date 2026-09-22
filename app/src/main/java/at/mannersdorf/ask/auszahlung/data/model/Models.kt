@@ -20,6 +20,10 @@ data class TrainingslisteDaten(
  * fixum = Spalte B ("Fixkosten"), ap = Spalte C ("AP"), punkte = Spalte D ("Punkte", roh -
  * für die Kopfzeilen-Anzeige), punkteMultiplikator = Spalte O (für die Punkte-Berechnung
  * in Ebene 3: Punkte-Betrag = punkte * punkteMultiplikator).
+ * einsaetze = Spalte N ("Einsätze pro Monat", nur für AP-Spieler relevant),
+ * trainingsgeldFaktor = Spalte L (für AP-Spieler: Trainingsgeld = fixum * trainingsgeldFaktor).
+ * Ein Spieler gilt als "AP-Spieler", wenn sein Name "(AP)" enthält - dann gelten andere
+ * Bezeichnungen/Berechnungen (Trainingsgeld statt Fixum, Auflaufprämie statt Punkte-Bonus).
  */
 data class SpielerKosten(
     val zeilenNummer: Int,
@@ -30,6 +34,8 @@ data class SpielerKosten(
     val punkteMultiplikator: String,
     val abzugSonstiges: String,
     val abzugMasseur: String,
+    val einsaetze: String,
+    val trainingsgeldFaktor: String,
     val rohWerte: List<String>
 )
 
@@ -73,7 +79,9 @@ data class SpaltenZuordnung(
     val punkteSpalte: String = "D",
     val punkteMultiplikatorSpalte: String = "O",
     val abzugSonstigesSpalte: String = "I",
-    val abzugMasseurSpalte: String = "J"
+    val abzugMasseurSpalte: String = "J",
+    val einsaetzeSpalte: String = "N",
+    val trainingsgeldFaktorSpalte: String = "L"
 )
 
 /**

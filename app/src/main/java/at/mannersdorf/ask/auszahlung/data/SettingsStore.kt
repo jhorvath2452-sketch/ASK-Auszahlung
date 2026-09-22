@@ -31,6 +31,8 @@ class SettingsStore(private val context: Context) {
         val SPALTE_PUNKTE_MULTIPLIKATOR = stringPreferencesKey("spalte_punkte_multiplikator")
         val SPALTE_ABZUG_SONSTIGES = stringPreferencesKey("spalte_abzug_sonstiges")
         val SPALTE_ABZUG_MASSEUR = stringPreferencesKey("spalte_abzug_masseur")
+        val SPALTE_EINSAETZE = stringPreferencesKey("spalte_einsaetze")
+        val SPALTE_TRAININGSGELD_FAKTOR = stringPreferencesKey("spalte_trainingsgeld_faktor")
     }
 
     // Standardwerte = die drei vom Verein bereits genutzten Google Sheets ("2026-27").
@@ -61,7 +63,9 @@ class SettingsStore(private val context: Context) {
             punkteSpalte = it[Keys.SPALTE_PUNKTE] ?: "D",
             punkteMultiplikatorSpalte = it[Keys.SPALTE_PUNKTE_MULTIPLIKATOR] ?: "O",
             abzugSonstigesSpalte = it[Keys.SPALTE_ABZUG_SONSTIGES] ?: "I",
-            abzugMasseurSpalte = it[Keys.SPALTE_ABZUG_MASSEUR] ?: "J"
+            abzugMasseurSpalte = it[Keys.SPALTE_ABZUG_MASSEUR] ?: "J",
+            einsaetzeSpalte = it[Keys.SPALTE_EINSAETZE] ?: "N",
+            trainingsgeldFaktorSpalte = it[Keys.SPALTE_TRAININGSGELD_FAKTOR] ?: "L"
         )
     }
 
@@ -84,6 +88,8 @@ class SettingsStore(private val context: Context) {
             it[Keys.SPALTE_PUNKTE_MULTIPLIKATOR] = zuordnung.punkteMultiplikatorSpalte
             it[Keys.SPALTE_ABZUG_SONSTIGES] = zuordnung.abzugSonstigesSpalte
             it[Keys.SPALTE_ABZUG_MASSEUR] = zuordnung.abzugMasseurSpalte
+            it[Keys.SPALTE_EINSAETZE] = zuordnung.einsaetzeSpalte
+            it[Keys.SPALTE_TRAININGSGELD_FAKTOR] = zuordnung.trainingsgeldFaktorSpalte
         }
     }
 }

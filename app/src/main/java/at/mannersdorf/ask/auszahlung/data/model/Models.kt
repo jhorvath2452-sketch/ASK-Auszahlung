@@ -58,6 +58,7 @@ data class KostenSpielbetriebDaten(
  */
 data class Auszahlungsbestaetigung(
     val monat: String,
+    val saison: String,
     val spielerName: String,
     val fixum: String,
     val punkte: String,
@@ -94,6 +95,7 @@ data class SpaltenZuordnung(
  */data class GespeicherteBestaetigung(
     val id: String,
     val monat: String,
+    val saison: String,
     val spielerName: String,
     val fixum: String,
     val punkte: String,

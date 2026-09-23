@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -24,7 +25,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import at.mannersdorf.ask.auszahlung.data.PdfErsteller
 import at.mannersdorf.ask.auszahlung.data.model.GespeicherteBestaetigung
@@ -197,10 +199,12 @@ fun BestaetigungenScreen(
     }
 }
 
+private const val LOESCH_PIN = "24521919"
+
 /**
- * Zwei-Schritte-Bestätigung fürs Löschen: erst Ja-Kästchen ankreuzen, dann
- * erst wird der Löschen-Button aktiv. Landet nicht sofort im Nichts, sondern
- * 40 Tage im Papierkorb (siehe FirebaseRepository).
+ * PIN-Bestätigung fürs Löschen: erst bei korrekt eingegebenem PIN wird der
+ * Löschen-Button aktiv. Landet nicht sofort im Nichts, sondern 40 Tage im
+ * Papierkorb (siehe FirebaseRepository).
  */
 @Composable
 private fun LoeschBestaetigungsDialog(
@@ -208,7 +212,8 @@ private fun LoeschBestaetigungsDialog(
     onAbbrechen: () -> Unit,
     onLoeschenBestaetigt: () -> Unit
 ) {
-    var bestaetigt by remember { mutableStateOf(false) }
+    var eingegebenerPin by remember { mutableStateOf("") }
+    val pinKorrekt = eingegebenerPin == LOESCH_PIN
 
     AlertDialog(
         onDismissRequest = onAbbrechen,
@@ -221,18 +226,20 @@ private fun LoeschBestaetigungsDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(checked = bestaetigt, onCheckedChange = { bestaetigt = it })
-                    Text("Ja, wirklich löschen")
-                }
+                OutlinedTextField(
+                    value = eingegebenerPin,
+                    onValueChange = { if (it.length <= 20) eingegebenerPin = it },
+                    label = { Text("PIN zum Bestätigen") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+                )
             }
         },
         confirmButton = {
             Button(
-                enabled = bestaetigt,
+                enabled = pinKorrekt,
                 onClick = onLoeschenBestaetigt,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB3261E))
             ) {

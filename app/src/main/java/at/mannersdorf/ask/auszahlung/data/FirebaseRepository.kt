@@ -62,6 +62,7 @@ class FirebaseRepository {
                 // 2. Restliche Daten + Link zur Unterschrift in Firestore ablegen
                 val dokument = hashMapOf(
                     "monat" to bestaetigung.monat,
+                    "saison" to bestaetigung.saison,
                     "spielerName" to bestaetigung.spielerName,
                     "fixum" to bestaetigung.fixum,
                     "punkte" to bestaetigung.punkte,
@@ -107,6 +108,7 @@ class FirebaseRepository {
                     GespeicherteBestaetigung(
                         id = dokument.id,
                         monat = dokument.getString("monat") ?: "",
+                        saison = dokument.getString("saison") ?: "2026-27",
                         spielerName = dokument.getString("spielerName") ?: "",
                         fixum = dokument.getString("fixum") ?: "",
                         punkte = dokument.getString("punkte") ?: "",
@@ -177,6 +179,7 @@ class FirebaseRepository {
                     GespeicherteBestaetigung(
                         id = dokument.id,
                         monat = dokument.getString("monat") ?: "",
+                        saison = dokument.getString("saison") ?: "2026-27",
                         spielerName = dokument.getString("spielerName") ?: "",
                         fixum = dokument.getString("fixum") ?: "",
                         punkte = dokument.getString("punkte") ?: "",
@@ -195,8 +198,67 @@ class FirebaseRepository {
             }
         }
 
-    /** Lädt die Unterschrift-PNG-Bytes über die Firebase-Storage-Download-URL. */
-    suspend fun leseUnterschriftBytes(unterschriftUrl: String): Result<ByteArray> =
+    /**
+     * Ebene "Statistik": lädt alle (nicht gelöschten) Bestätigungen einer
+     * Person innerhalb einer Saison, egal ob Spieler/Masseur/Tormanntrainer/
+     * Betreuung - für die Monats- bzw. Saisonsumme.
+     */
+    suspend fun leseBestaetigungenFuerStatistik(spielerName: String, saison: String): Result<List<GespeicherteBestaetigung>> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                val ergebnis = firestore.collection("auszahlungen")
+                    .whereEqualTo("spielerName", spielerName)
+                    .whereEqualTo("saison", saison)
+                    .get()
+                    .await()
+
+                val alle = ergebnis.documents.map { dokument ->
+                    GespeicherteBestaetigung(
+                        id = dokument.id,
+                        monat = dokument.getString("monat") ?: "",
+                        saison = dokument.getString("saison") ?: "2026-27",
+                        spielerName = dokument.getString("spielerName") ?: "",
+                        fixum = dokument.getString("fixum") ?: "",
+                        punkte = dokument.getString("punkte") ?: "",
+                        abzugSonstiges = dokument.getString("abzugSonstiges") ?: "",
+                        abzugMasseur = dokument.getString("abzugMasseur") ?: "",
+                        korrektur = dokument.getString("korrektur") ?: "0",
+                        bemerkung = dokument.getString("bemerkung") ?: "",
+                        betragErhalten = dokument.getString("betragErhalten") ?: "",
+                        unterschriftUrl = dokument.getString("unterschriftUrl") ?: "",
+                        erstelltAm = dokument.getString("erstelltAm") ?: "",
+                        geloeschtAm = dokument.getLong("geloeschtAm")
+                    )
+                }
+                Result.success(alle.filter { it.geloeschtAm == null })
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    /**
+     * Liefert die Namen aller Personen, die schon einmal eine Bestätigung
+     * bekommen haben (Spieler/Masseur/Tormanntrainer/Betreuung gemeinsam,
+     * ohne Unterscheidung), für das Namens-Dropdown in der Statistik.
+     */
+    suspend fun leseAlleBekanntenNamen(): Result<List<String>> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                val ergebnis = firestore.collection("auszahlungen").get().await()
+                val namen = ergebnis.documents
+                    .mapNotNull { it.getString("spielerName") }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .sorted()
+                Result.success(namen)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    /** Lädt die Unterschrift-PNG-Bytes über die Firebase-Storage-Download-URL. */    suspend fun leseUnterschriftBytes(unterschriftUrl: String): Result<ByteArray> =
         withContext(Dispatchers.IO) {
             try {
                 if (unterschriftUrl.isBlank()) return@withContext Result.failure(IllegalArgumentException("Keine Unterschrift-URL"))

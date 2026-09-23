@@ -25,7 +25,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class Ebene { TRAININGSLISTE, KOSTEN_SPIELBETRIEB, SPIELER, MASSEUR, TORMANNTRAINER, BETREUUNG, BESTAETIGUNGEN }
+enum class Ebene { TRAININGSLISTE, KOSTEN_SPIELBETRIEB, SPIELER, MASSEUR, TORMANNTRAINER, BETREUUNG, STATISTIK, BESTAETIGUNGEN }
+
+/** Alle Monate einer Saison, in chronologischer Reihenfolge (Dezember/Winterpause bewusst ausgelassen). */
+val SAISON_MONATE = listOf(
+    "Jänner2026", "Februar2026", "März2026", "April2026", "Mai2026",
+    "Juni2026", "Juli2026", "August2026", "September2026", "Oktober2026", "November2026"
+)
+val VERFUEGBARE_SAISONEN = listOf("2026-27", "TEST")
 
 data class HauptZustand(
     /** true, sobald die anonyme Firebase-Anmeldung + der erste Datenabruf durch sind. */
@@ -58,6 +65,15 @@ data class HauptZustand(
     // Ebene 4: bereits gespeicherte Bestätigungen (aus Firestore).
     val bestaetigungen: List<GespeicherteBestaetigung> = emptyList(),
     val bestaetigungenLadenFehler: String? = null,
+
+    // Ebene "Statistik": Name+Saison bestimmen die geladenen Bestätigungen,
+    // die Monatsauswahl filtert rein clientseitig (keine neue Abfrage nötig).
+    val statistikNamen: List<String> = emptyList(),
+    val statistikGewaehlterName: String? = null,
+    val statistikGewaehlteSaison: String = VERFUEGBARE_SAISONEN.first(),
+    val statistikGewaehlteMonate: Set<String> = SAISON_MONATE.toSet(),
+    val statistikErgebnisse: List<GespeicherteBestaetigung> = emptyList(),
+    val statistikLadenFehler: String? = null,
 
     // Gesetzt, wenn die App über eine Push-Benachrichtigung geöffnet wurde -
     // dann soll die betreffende Bestätigung automatisch als PDF geöffnet werden.
@@ -106,6 +122,9 @@ class MainViewModel(private val context: Context) : ViewModel() {
         if (ebene == Ebene.BESTAETIGUNGEN && _zustand.value.bestaetigungen.isEmpty()) {
             ladeBestaetigungen()
         }
+        if (ebene == Ebene.STATISTIK && _zustand.value.statistikNamen.isEmpty()) {
+            ladeStatistikNamen()
+        }
     }
 
     fun ladeBestaetigungen() {
@@ -124,6 +143,55 @@ class MainViewModel(private val context: Context) : ViewModel() {
     /** Für Ebene 4: lädt die Unterschrift-PNG-Bytes einer gespeicherten Bestätigung bei Bedarf. */
     suspend fun ladeUnterschriftBytes(unterschriftUrl: String): ByteArray? =
         firebaseRepository.leseUnterschriftBytes(unterschriftUrl).getOrNull()
+
+    // ---------- Statistik ----------
+
+    fun ladeStatistikNamen() {
+        viewModelScope.launch {
+            setLaden(true)
+            val ergebnis = firebaseRepository.leseAlleBekanntenNamen()
+            ergebnis.onSuccess { namen ->
+                _zustand.value = _zustand.value.copy(statistikNamen = namen, statistikLadenFehler = null)
+            }.onFailure {
+                _zustand.value = _zustand.value.copy(statistikLadenFehler = "Namen konnten nicht geladen werden: ${it.message}")
+            }
+            setLaden(false)
+        }
+    }
+
+    fun waehleStatistikName(name: String) {
+        _zustand.value = _zustand.value.copy(statistikGewaehlterName = name)
+        ladeStatistikDaten()
+    }
+
+    fun waehleStatistikSaison(saison: String) {
+        _zustand.value = _zustand.value.copy(statistikGewaehlteSaison = saison)
+        ladeStatistikDaten()
+    }
+
+    /** Reine UI-Auswahl, keine neue Abfrage nötig - die Summierung passiert im Screen selbst. */
+    fun waehleStatistikMonate(monate: Set<String>) {
+        _zustand.value = _zustand.value.copy(statistikGewaehlteMonate = monate)
+    }
+
+    private fun ladeStatistikDaten() {
+        val name = _zustand.value.statistikGewaehlterName ?: return
+        val saison = _zustand.value.statistikGewaehlteSaison
+        viewModelScope.launch {
+            setLaden(true)
+            val ergebnis = firebaseRepository.leseBestaetigungenFuerStatistik(name, saison)
+            ergebnis.onSuccess { liste ->
+                _zustand.value = _zustand.value.copy(statistikErgebnisse = liste, statistikLadenFehler = null)
+            }.onFailure {
+                _zustand.value = _zustand.value.copy(statistikLadenFehler = "Statistik konnte nicht geladen werden: ${it.message}")
+            }
+            setLaden(false)
+        }
+    }
+
+    /** Welche Saison beim Speichern einer neuen Bestätigung gilt - abgeleitet vom aktiven Datensatz (siehe waehleDatensatz). */
+    private fun aktuelleSaison(): String =
+        if (_zustand.value.trainingslisteSheetId == SettingsStore.TEST_TRAININGSLISTE_ID) "TEST" else "2026-27"
 
     /**
      * Lädt die Tab-Listen BEIDER Tabellen und bildet die Schnittmenge: nur
@@ -267,6 +335,7 @@ class MainViewModel(private val context: Context) : ViewModel() {
 
         val bestaetigung = Auszahlungsbestaetigung(
             monat = z.gewaehlterMonat ?: "",
+            saison = aktuelleSaison(),
             spielerName = spieler.name,
             fixum = spieler.fixum,
             punkte = spieler.punkte,
@@ -373,6 +442,7 @@ class MainViewModel(private val context: Context) : ViewModel() {
         val zeitstempel = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.GERMANY).format(Date())
         val bestaetigung = Auszahlungsbestaetigung(
             monat = z.gewaehlterMonat ?: "",
+            saison = aktuelleSaison(),
             spielerName = spielerName,
             fixum = fixumFeld,
             punkte = "",

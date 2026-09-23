@@ -185,6 +185,11 @@ fun MainScreen(viewModel: MainViewModel) {
                                 text = { Text("Betreuung") }
                             )
                             Tab(
+                                selected = zustand.aktiveEbene == Ebene.STATISTIK,
+                                onClick = { viewModel.wechsleEbene(Ebene.STATISTIK) },
+                                text = { Text("Statistik") }
+                            )
+                            Tab(
                                 selected = zustand.aktiveEbene == Ebene.BESTAETIGUNGEN,
                                 onClick = { viewModel.wechsleEbene(Ebene.BESTAETIGUNGEN) },
                                 text = { Text("Bestätigung") }
@@ -238,6 +243,18 @@ fun MainScreen(viewModel: MainViewModel) {
                                 speichernErfolgreich = zustand.speichernErfolgreich,
                                 onAusgewaehlt = viewModel::waehleBetreuer,
                                 onDatenUebernehmen = viewModel::speichereBetreuungAuszahlung,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            Ebene.STATISTIK -> StatistikScreen(
+                                namen = zustand.statistikNamen,
+                                gewaehlterName = zustand.statistikGewaehlterName,
+                                gewaehlteSaison = zustand.statistikGewaehlteSaison,
+                                gewaehlteMonate = zustand.statistikGewaehlteMonate,
+                                ergebnisse = zustand.statistikErgebnisse,
+                                fehler = zustand.statistikLadenFehler,
+                                onNameGewaehlt = viewModel::waehleStatistikName,
+                                onSaisonGewaehlt = viewModel::waehleStatistikSaison,
+                                onMonateGewaehlt = viewModel::waehleStatistikMonate,
                                 modifier = Modifier.fillMaxSize()
                             )
                             Ebene.BESTAETIGUNGEN -> BestaetigungenScreen(
@@ -331,7 +348,7 @@ private fun AppKopfzeile(
                 "©chigo2452",
                 color = Color.White,
                 fontFamily = FontFamily.SansSerif,
-                fontSize = 26.sp,
+                fontSize = 7.sp,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 12.dp, bottom = 6.dp)

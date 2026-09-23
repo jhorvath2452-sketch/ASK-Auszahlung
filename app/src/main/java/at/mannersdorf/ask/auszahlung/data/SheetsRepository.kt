@@ -51,20 +51,23 @@ class SheetsRepository {
     }
 
     /**
-     * Ebene 2 ("Kosten") + Basis für Ebene 3 ("Spieler"): liefert sowohl die
-     * kompletten Rohzeilen (für eine an das Google Sheet angelehnte Anzeige) als
-     * auch die daraus geparste Spielerliste (feste Spaltenbuchstaben, siehe
-     * SpaltenZuordnung). Die Spielerzeilen werden ab der Kopfzeile erkannt, deren
-     * erste beiden Zellen "Name" und "Fixkosten" enthalten und die mindestens 5
-     * befüllte Spalten hat (unterscheidet die große Detailtabelle von einem
-     * kleineren "Name/Fixkosten/Bemerkung"-Block weiter oben im Sheet).
+     * Ebene 2 ("Kosten") + Basis für Ebene 3-5 ("Spieler"/"Masseur"/"Betreuung"):
+     * liefert sowohl die kompletten Rohzeilen (für eine an das Google Sheet
+     * angelehnte Anzeige) als auch die daraus geparste Spielerliste (feste
+     * Spaltenbuchstaben, siehe SpaltenZuordnung). Führende Bannerzeilen (z.B.
+     * eine Titelzeile "KOSTEN SPIELBETRIEB" mit nur einer befüllten Zelle)
+     * werden übersprungen. Die Spielerzeilen werden ab der Kopfzeile erkannt,
+     * deren erste beiden Zellen "Name" und "Fixkosten" enthalten und die
+     * mindestens 5 befüllte Spalten hat (unterscheidet die große Detailtabelle
+     * von einem kleineren "Name/Fixkosten/Bemerkung"-Block weiter oben im Sheet).
      */
     suspend fun leseKostenSpielbetrieb(
         spreadsheetId: String,
         monat: String,
         spalten: SpaltenZuordnung
     ): KostenSpielbetriebDaten {
-        val werte = leseRohWerte(spreadsheetId, "'$monat'!A1:S500")
+        val rohWerte = leseRohWerte(spreadsheetId, "'$monat'!A1:W500")
+        val werte = rohWerte.dropWhile { zeile -> zeile.count { it.isNotBlank() } <= 1 }
         if (werte.isEmpty()) return KostenSpielbetriebDaten(monat, emptyList(), emptyList())
 
         val nameIdx = spaltenBuchstabeZuIndex(spalten.nameSpalte)
@@ -76,6 +79,8 @@ class SheetsRepository {
         val masseurIdx = spaltenBuchstabeZuIndex(spalten.abzugMasseurSpalte)
         val einsaetzeIdx = spaltenBuchstabeZuIndex(spalten.einsaetzeSpalte)
         val trainingsgeldFaktorIdx = spaltenBuchstabeZuIndex(spalten.trainingsgeldFaktorSpalte)
+        val masseurFaktorIdx = spaltenBuchstabeZuIndex(spalten.masseurFaktorSpalte)
+        val masseurEinsaetzeIdx = spaltenBuchstabeZuIndex(spalten.masseurEinsaetzeSpalte)
 
         // Start der Detail-Spielertabelle finden (zweite "Name/Fixkosten"-Kopfzeile).
         var startZeile = -1
@@ -112,6 +117,8 @@ class SheetsRepository {
                         abzugMasseur = zeile.getOrNull(masseurIdx) ?: "",
                         einsaetze = zeile.getOrNull(einsaetzeIdx) ?: "",
                         trainingsgeldFaktor = zeile.getOrNull(trainingsgeldFaktorIdx) ?: "",
+                        masseurFaktor = zeile.getOrNull(masseurFaktorIdx) ?: "",
+                        masseurEinsaetze = zeile.getOrNull(masseurEinsaetzeIdx) ?: "",
                         rohWerte = zeile
                     )
                 )

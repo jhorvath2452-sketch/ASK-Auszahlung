@@ -49,6 +49,8 @@ fun SettingsScreen(
     var masseurSpalte by remember { mutableStateOf(spaltenZuordnung.abzugMasseurSpalte) }
     var einsaetzeSpalte by remember { mutableStateOf(spaltenZuordnung.einsaetzeSpalte) }
     var trainingsgeldFaktorSpalte by remember { mutableStateOf(spaltenZuordnung.trainingsgeldFaktorSpalte) }
+    var masseurFaktorSpalte by remember { mutableStateOf(spaltenZuordnung.masseurFaktorSpalte) }
+    var masseurEinsaetzeSpalte by remember { mutableStateOf(spaltenZuordnung.masseurEinsaetzeSpalte) }
 
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -74,12 +76,15 @@ fun SettingsScreen(
         OutlinedTextField(masseurSpalte, { masseurSpalte = it.uppercase() }, label = { Text("Spalte: Abzug Masseur") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(einsaetzeSpalte, { einsaetzeSpalte = it.uppercase() }, label = { Text("Spalte: Einsätze pro Monat (AP-Spieler)") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(trainingsgeldFaktorSpalte, { trainingsgeldFaktorSpalte = it.uppercase() }, label = { Text("Spalte: Trainingsgeld-Faktor (AP-Spieler)") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(masseurFaktorSpalte, { masseurFaktorSpalte = it.uppercase() }, label = { Text("Spalte: Aufwandsentschädigung-Faktor (Masseur)") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(masseurEinsaetzeSpalte, { masseurEinsaetzeSpalte = it.uppercase() }, label = { Text("Spalte: Einsätze pro Monat (Masseur)") }, modifier = Modifier.fillMaxWidth())
         Button(
             onClick = {
                 onSpaltenSpeichern(
                     SpaltenZuordnung(
                         nameSpalte, fixumSpalte, apSpalte, punkteSpalte, punkteMultSpalte,
-                        sonstigesSpalte, masseurSpalte, einsaetzeSpalte, trainingsgeldFaktorSpalte
+                        sonstigesSpalte, masseurSpalte, einsaetzeSpalte, trainingsgeldFaktorSpalte,
+                        masseurFaktorSpalte, masseurEinsaetzeSpalte
                     )
                 )
             },

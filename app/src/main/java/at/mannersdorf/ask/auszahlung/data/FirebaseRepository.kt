@@ -28,6 +28,10 @@ import kotlinx.coroutines.withContext
  */
 class FirebaseRepository {
 
+    companion object {
+        private const val AUFBEWAHRUNG_PAPIERKORB_MS = 40L * 24 * 60 * 60 * 1000
+    }
+
     private val auth by lazy { Firebase.auth }
     private val firestore by lazy { Firebase.firestore }
     private val storage by lazy { Firebase.storage }
@@ -82,7 +86,12 @@ class FirebaseRepository {
             }
         }
 
-    /** Ebene 4 ("Bestätigungen"): lädt die zuletzt gespeicherten Bestätigungen. */
+    /**
+     * Ebene "Bestätigungen": lädt die zuletzt gespeicherten, NICHT gelöschten
+     * Bestätigungen. Bestätigungen, die vor mehr als 40 Tagen gelöscht wurden,
+     * werden dabei endgültig entfernt (Firestore-Dokument + Unterschrift in
+     * Storage) - bis dahin liegen sie wie in einem Papierkorb im Hintergrund.
+     */
     suspend fun leseBestaetigungen(limit: Long = 300): Result<List<GespeicherteBestaetigung>> =
         withContext(Dispatchers.IO) {
             try {
@@ -93,7 +102,8 @@ class FirebaseRepository {
                     .get()
                     .await()
 
-                val liste = ergebnis.documents.map { dokument ->
+                val jetzt = System.currentTimeMillis()
+                val alle = ergebnis.documents.map { dokument ->
                     GespeicherteBestaetigung(
                         id = dokument.id,
                         monat = dokument.getString("monat") ?: "",
@@ -106,14 +116,53 @@ class FirebaseRepository {
                         bemerkung = dokument.getString("bemerkung") ?: "",
                         betragErhalten = dokument.getString("betragErhalten") ?: "",
                         unterschriftUrl = dokument.getString("unterschriftUrl") ?: "",
-                        erstelltAm = dokument.getString("erstelltAm") ?: ""
+                        erstelltAm = dokument.getString("erstelltAm") ?: "",
+                        geloeschtAm = dokument.getLong("geloeschtAm")
                     )
                 }
-                Result.success(liste)
+
+                // Endgültig löschen, was schon länger als 40 Tage im Papierkorb liegt.
+                for (b in alle) {
+                    if (b.geloeschtAm != null && jetzt - b.geloeschtAm > AUFBEWAHRUNG_PAPIERKORB_MS) {
+                        loescheEndgueltig(b)
+                    }
+                }
+
+                val sichtbar = alle.filter { it.geloeschtAm == null }
+                Result.success(sichtbar)
             } catch (e: Exception) {
                 Result.failure(e)
             }
         }
+
+    /** Verschiebt eine Bestätigung in den Papierkorb (bleibt 40 Tage erhalten, dann endgültig gelöscht). */
+    suspend fun loescheBestaetigung(id: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                firestore.collection("auszahlungen").document(id)
+                    .update("geloeschtAm", System.currentTimeMillis())
+                    .await()
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    private suspend fun loescheEndgueltig(bestaetigung: GespeicherteBestaetigung) {
+        try {
+            if (bestaetigung.unterschriftUrl.isNotBlank()) {
+                storage.getReferenceFromUrl(bestaetigung.unterschriftUrl).delete().await()
+            }
+        } catch (_: Exception) {
+            // Unterschrift evtl. schon weg - Firestore-Dokument trotzdem aufräumen.
+        }
+        try {
+            firestore.collection("auszahlungen").document(bestaetigung.id).delete().await()
+        } catch (_: Exception) {
+            // Wird beim nächsten Laden erneut versucht.
+        }
+    }
 
     /** Lädt die Unterschrift-PNG-Bytes über die Firebase-Storage-Download-URL. */
     suspend fun leseUnterschriftBytes(unterschriftUrl: String): Result<ByteArray> =

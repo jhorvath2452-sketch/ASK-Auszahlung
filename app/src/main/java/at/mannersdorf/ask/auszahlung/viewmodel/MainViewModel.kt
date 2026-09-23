@@ -12,6 +12,10 @@ import at.mannersdorf.ask.auszahlung.data.model.GespeicherteBestaetigung
 import at.mannersdorf.ask.auszahlung.data.model.KostenSpielbetriebDaten
 import at.mannersdorf.ask.auszahlung.data.model.SpaltenZuordnung
 import at.mannersdorf.ask.auszahlung.data.model.TrainingslisteDaten
+import at.mannersdorf.ask.auszahlung.data.model.istBetreuung
+import at.mannersdorf.ask.auszahlung.data.model.istMasseur
+import at.mannersdorf.ask.auszahlung.data.parseDeutscheZahl
+import at.mannersdorf.ask.auszahlung.data.formatiereDeutscheZahl
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -20,7 +24,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class Ebene { TRAININGSLISTE, KOSTEN_SPIELBETRIEB, SPIELER, BESTAETIGUNGEN }
+enum class Ebene { TRAININGSLISTE, KOSTEN_SPIELBETRIEB, SPIELER, MASSEUR, BETREUUNG, BESTAETIGUNGEN }
 
 data class HauptZustand(
     /** true, sobald die anonyme Firebase-Anmeldung + der erste Datenabruf durch sind. */
@@ -41,6 +45,8 @@ data class HauptZustand(
     val kostenSpielbetrieb: KostenSpielbetriebDaten? = null,
 
     val gewaehlterSpieler: String? = null,
+    val gewaehlterMasseur: String? = null,
+    val gewaehlterBetreuer: String? = null,
     val speichernErfolgreich: Boolean = false,
     val trainingslisteSheetId: String = "",
     val kostenSpielbetriebSheetId: String = "",
@@ -172,9 +178,13 @@ class MainViewModel(private val context: Context) : ViewModel() {
             val spalten = settingsStore.spaltenZuordnung.first()
             val daten = sheetsRepository.leseKostenSpielbetrieb(sheetId, monat, spalten)
             val ersterSpieler = daten.spieler.firstOrNull()?.name
+            val ersterMasseur = daten.spieler.firstOrNull { it.istMasseur() }?.name
+            val ersterBetreuer = daten.spieler.firstOrNull { it.istBetreuung() }?.name
             _zustand.value = _zustand.value.copy(
                 kostenSpielbetrieb = daten,
                 gewaehlterSpieler = ersterSpieler,
+                gewaehlterMasseur = ersterMasseur,
+                gewaehlterBetreuer = ersterBetreuer,
                 fehler = null
             )
         } catch (e: Exception) {
@@ -186,6 +196,14 @@ class MainViewModel(private val context: Context) : ViewModel() {
 
     fun waehleSpieler(name: String) {
         _zustand.value = _zustand.value.copy(gewaehlterSpieler = name, speichernErfolgreich = false)
+    }
+
+    fun waehleMasseur(name: String) {
+        _zustand.value = _zustand.value.copy(gewaehlterMasseur = name, speichernErfolgreich = false)
+    }
+
+    fun waehleBetreuer(name: String) {
+        _zustand.value = _zustand.value.copy(gewaehlterBetreuer = name, speichernErfolgreich = false)
     }
 
     fun setSpaltenZuordnung(zuordnung: SpaltenZuordnung) {
@@ -256,6 +274,105 @@ class MainViewModel(private val context: Context) : ViewModel() {
                 _zustand.value = _zustand.value.copy(speichernErfolgreich = true, fehler = null, bestaetigungen = emptyList())
             }.onFailure {
                 _zustand.value = _zustand.value.copy(fehler = "Speichern fehlgeschlagen: ${it.message}")
+            }
+            setLaden(false)
+        }
+    }
+
+    /** Aufwandsentschädigung für Masseure = Spalte C ("AP"-Feld, hier Satz pro Anwesenheit) × Spalte F. */
+    fun speichereMasseurAuszahlung(
+        bemerkung: String,
+        korrektur: String,
+        unterschriftPngBase64: String
+    ) {
+        val z = _zustand.value
+        val spieler = z.kostenSpielbetrieb?.spieler?.find { it.name == z.gewaehlterMasseur } ?: return
+        val satz = parseDeutscheZahl(spieler.ap) ?: 0.0
+        val faktor = parseDeutscheZahl(spieler.masseurFaktor) ?: 0.0
+        val aufwandsentschaedigung = satz * faktor
+        val korrekturZahl = parseDeutscheZahl(korrektur) ?: 0.0
+        val betrag = aufwandsentschaedigung + korrekturZahl
+
+        speichereEinfacheAuszahlung(
+            spielerName = spieler.name,
+            fixumFeld = formatiereDeutscheZahl(aufwandsentschaedigung),
+            korrektur = korrektur,
+            betragErhalten = formatiereDeutscheZahl(betrag),
+            bemerkung = bemerkung,
+            unterschriftPngBase64 = unterschriftPngBase64
+        )
+    }
+
+    /** Aufwandsentschädigung für Betreuung (Trainer/Wäsche) = Fixkosten (Spalte B), unverändert. */
+    fun speichereBetreuungAuszahlung(
+        bemerkung: String,
+        korrektur: String,
+        unterschriftPngBase64: String
+    ) {
+        val z = _zustand.value
+        val spieler = z.kostenSpielbetrieb?.spieler?.find { it.name == z.gewaehlterBetreuer } ?: return
+        val aufwandsentschaedigung = parseDeutscheZahl(spieler.fixum) ?: 0.0
+        val korrekturZahl = parseDeutscheZahl(korrektur) ?: 0.0
+        val betrag = aufwandsentschaedigung + korrekturZahl
+
+        speichereEinfacheAuszahlung(
+            spielerName = spieler.name,
+            fixumFeld = formatiereDeutscheZahl(aufwandsentschaedigung),
+            korrektur = korrektur,
+            betragErhalten = formatiereDeutscheZahl(betrag),
+            bemerkung = bemerkung,
+            unterschriftPngBase64 = unterschriftPngBase64
+        )
+    }
+
+    private fun speichereEinfacheAuszahlung(
+        spielerName: String,
+        fixumFeld: String,
+        korrektur: String,
+        betragErhalten: String,
+        bemerkung: String,
+        unterschriftPngBase64: String
+    ) {
+        val z = _zustand.value
+        val zeitstempel = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.GERMANY).format(Date())
+        val bestaetigung = Auszahlungsbestaetigung(
+            monat = z.gewaehlterMonat ?: "",
+            spielerName = spielerName,
+            fixum = fixumFeld,
+            punkte = "",
+            abzugSonstiges = "",
+            abzugMasseur = "",
+            korrektur = korrektur,
+            bemerkung = bemerkung.take(250),
+            betragErhalten = betragErhalten,
+            unterschriftPngBase64 = unterschriftPngBase64,
+            erstelltAmIso = zeitstempel
+        )
+
+        viewModelScope.launch {
+            setLaden(true)
+            val ergebnis = firebaseRepository.speichereBestaetigung(bestaetigung)
+            ergebnis.onSuccess {
+                _zustand.value = _zustand.value.copy(speichernErfolgreich = true, fehler = null, bestaetigungen = emptyList())
+            }.onFailure {
+                _zustand.value = _zustand.value.copy(fehler = "Speichern fehlgeschlagen: ${it.message}")
+            }
+            setLaden(false)
+        }
+    }
+
+    /** Verschiebt eine Bestätigung in den Papierkorb (endgültige Löschung automatisch nach 40 Tagen). */
+    fun loescheBestaetigung(id: String) {
+        viewModelScope.launch {
+            setLaden(true)
+            val ergebnis = firebaseRepository.loescheBestaetigung(id)
+            ergebnis.onSuccess {
+                _zustand.value = _zustand.value.copy(
+                    bestaetigungen = _zustand.value.bestaetigungen.filterNot { it.id == id },
+                    fehler = null
+                )
+            }.onFailure {
+                _zustand.value = _zustand.value.copy(fehler = "Löschen fehlgeschlagen: ${it.message}")
             }
             setLaden(false)
         }

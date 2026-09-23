@@ -36,6 +36,8 @@ data class SpielerKosten(
     val abzugMasseur: String,
     val einsaetze: String,
     val trainingsgeldFaktor: String,
+    val masseurFaktor: String,
+    val masseurEinsaetze: String,
     val rohWerte: List<String>
 )
 
@@ -81,14 +83,15 @@ data class SpaltenZuordnung(
     val abzugSonstigesSpalte: String = "I",
     val abzugMasseurSpalte: String = "J",
     val einsaetzeSpalte: String = "N",
-    val trainingsgeldFaktorSpalte: String = "L"
+    val trainingsgeldFaktorSpalte: String = "L",
+    val masseurFaktorSpalte: String = "F",
+    val masseurEinsaetzeSpalte: String = "S"
 )
 
 /**
  * Ebene 4 ("Bestätigungen"): eine aus Firestore geladene, bereits gespeicherte
  * Auszahlungsbestätigung, zum Ansehen/Exportieren als PDF bzw. Teilen per Mail.
- */
-data class GespeicherteBestaetigung(
+ */data class GespeicherteBestaetigung(
     val id: String,
     val monat: String,
     val spielerName: String,
@@ -100,5 +103,19 @@ data class GespeicherteBestaetigung(
     val bemerkung: String,
     val betragErhalten: String,
     val unterschriftUrl: String,
-    val erstelltAm: String
+    val erstelltAm: String,
+    val geloeschtAm: Long? = null
 )
+
+/** Ein Spieler gilt als AP-Spieler ("Auflaufprämie"), wenn sein Name "(AP)" enthält. */
+fun SpielerKosten.istApSpieler(): Boolean = name.contains("(AP)", ignoreCase = true)
+
+/** Ebene "Masseur": betrifft alle Zeilen, deren Name "Masseur" enthält. */
+fun SpielerKosten.istMasseur(): Boolean = name.contains("Masseur", ignoreCase = true)
+
+/** Ebene "Betreuung": betrifft alle Zeilen, deren Name "Trainer" oder "Wäsche" enthält. */
+fun SpielerKosten.istBetreuung(): Boolean =
+    name.contains("Trainer", ignoreCase = true) || name.contains("Wäsche", ignoreCase = true)
+
+/** Zeilen mit einem "*" am Namensende sind farblich hervorzuheben ("KEINE AUSZAHLUNG"). */
+fun SpielerKosten.hatKeineAuszahlungMarkierung(): Boolean = name.trim().endsWith("*")

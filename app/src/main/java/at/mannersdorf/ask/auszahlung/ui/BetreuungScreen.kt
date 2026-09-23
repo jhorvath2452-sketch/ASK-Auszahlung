@@ -46,57 +46,54 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import at.mannersdorf.ask.auszahlung.data.formatiereDeutscheZahl
 import at.mannersdorf.ask.auszahlung.data.model.SpielerKosten
+import at.mannersdorf.ask.auszahlung.data.model.istBetreuung
 import at.mannersdorf.ask.auszahlung.data.parseDeutscheZahl
 
-private const val KORREKTUR_MIN = -2000.0
-private const val KORREKTUR_MAX = 2000.0
-
+/**
+ * Ebene "Betreuung": betrifft alle Zeilen aus "Kosten Spielbetrieb", deren Name
+ * "Trainer" oder "Wäsche" enthält. Vereinfachtes Formular: Aufwandsentschädigung
+ * = Fixkosten (Spalte B), keine weiteren Abzüge/Boni.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AuszahlungScreen(
+fun BetreuungScreen(
     monat: String?,
-    spielerListe: List<SpielerKosten>,
-    gewaehlterSpielerName: String?,
+    alleSpieler: List<SpielerKosten>,
+    gewaehlterName: String?,
     speichernErfolgreich: Boolean,
-    onSpielerGewaehlt: (String) -> Unit,
-    onDatenUebernehmen: (bemerkung: String, betragErhalten: String, korrektur: String, unterschriftBase64: String) -> Unit,
+    onAusgewaehlt: (String) -> Unit,
+    onDatenUebernehmen: (bemerkung: String, korrektur: String, unterschriftBase64: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val spieler = spielerListe.find { it.name == gewaehlterSpielerName }
+    val betreuer = remember(alleSpieler) { alleSpieler.filter { it.istBetreuung() } }
+    val spieler = betreuer.find { it.name == gewaehlterName }
     var dropdownOffen by remember { mutableStateOf(false) }
-    var bemerkung by remember(gewaehlterSpielerName) { mutableStateOf("") }
-    var korrektur by remember(gewaehlterSpielerName) { mutableStateOf("0") }
-    var unterschriftBase64 by remember(gewaehlterSpielerName) { mutableStateOf<String?>(null) }
+    var bemerkung by remember(gewaehlterName) { mutableStateOf("") }
+    var korrektur by remember(gewaehlterName) { mutableStateOf("0") }
+    var unterschriftBase64 by remember(gewaehlterName) { mutableStateOf<String?>(null) }
     var zeigeSignaturPad by remember { mutableStateOf(false) }
 
-    // Ausbezahlter Betrag ist nicht editierbar, sondern wird immer aus FIXUM,
-    // Punkten, Abzügen und der Korrektur berechnet.
-    val ausbezahlterBetrag = berechneAusbezahltenBetrag(spieler, korrektur)
+    val aufwandsentschaedigung = spieler?.let { parseDeutscheZahl(it.fixum) ?: 0.0 } ?: 0.0
+    val ausbezahlterBetrag = aufwandsentschaedigung + (parseDeutscheZahl(korrektur) ?: 0.0)
 
     Column(
-        modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)
     ) {
         ExposedDropdownMenuBox(expanded = dropdownOffen, onExpandedChange = { dropdownOffen = it }) {
             OutlinedTextField(
-                value = gewaehlterSpielerName ?: "Spieler wählen",
+                value = gewaehlterName ?: "Betreuer wählen",
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("Spieler") },
+                label = { Text("Betreuung") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownOffen) },
                 modifier = Modifier.fillMaxWidth().menuAnchor()
             )
-            ExposedDropdownMenu(
-                expanded = dropdownOffen,
-                onDismissRequest = { dropdownOffen = false }
-            ) {
-                spielerListe.forEach { s ->
+            ExposedDropdownMenu(expanded = dropdownOffen, onDismissRequest = { dropdownOffen = false }) {
+                betreuer.forEach { s ->
                     DropdownMenuItem(
                         text = { Text(s.name) },
                         onClick = {
-                            onSpielerGewaehlt(s.name)
+                            onAusgewaehlt(s.name)
                             unterschriftBase64 = null
                             dropdownOffen = false
                         }
@@ -108,39 +105,21 @@ fun AuszahlungScreen(
         Spacer(Modifier.height(16.dp))
 
         if (spieler == null) {
-            Text("Bitte einen Spieler auswählen.")
+            Text(if (betreuer.isEmpty()) "Keine Betreuung-Einträge gefunden." else "Bitte auswählen.")
             return@Column
         }
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
-                val istAp = istApSpieler(spieler)
                 Text(
-                    "${spieler.name}  (${if (istAp) "Trainingsgeld" else "Fixkosten"}: ${spieler.fixum}  |  AP: ${spieler.ap}  |  Punkte: ${spieler.punkte})",
+                    "${spieler.name}  (Fixkosten: ${spieler.fixum.replace("€", "").trim()} €)",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(4.dp))
                 Text("Monat: ${monat ?: "-"}", fontWeight = FontWeight.Bold)
-                Text(
-                    "Punkte pro Monat: " + zeigeWertOderRoh(spieler.punkteMultiplikator),
-                    fontWeight = FontWeight.Bold
-                )
-                if (istAp) {
-                    Text(
-                        "Einsätze pro Monat: " + ganzzahlOderRoh(spieler.einsaetze) +
-                            "    Trainings pro Monat: " + ganzzahlOderRoh(spieler.trainingsgeldFaktor),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
                 Spacer(Modifier.height(12.dp))
-                InfoZeile(
-                    if (istAp) "TRAININGSGELD" else "FIXUM",
-                    "€ " + formatiereDeutscheZahl(berechneBasisBetrag(spieler))
-                )
-                InfoZeile("PUNKTE / AUFLAUFPRÄMIE", "€ " + formatiereDeutscheZahl(berechneBonusBetrag(spieler)))
-                InfoZeile("Abzug Masseur", "€ ${spieler.abzugMasseur.replace("€", "").trim()}")
-                InfoZeile("Abzug Sonstiges", "€ ${spieler.abzugSonstiges.replace("€", "").trim()}")
+                InfoZeileBetreuung("AUFWANDSENTSCHÄDIGUNG", "€ " + formatiereDeutscheZahl(aufwandsentschaedigung))
             }
         }
 
@@ -148,7 +127,7 @@ fun AuszahlungScreen(
 
         OutlinedTextField(
             value = korrektur,
-            onValueChange = { neu -> korrektur = begrenzeKorrektur(neu) },
+            onValueChange = { neu -> korrektur = begrenzeKorrekturBetreuung(neu) },
             label = { Text("Korrektur (€)") },
             supportingText = { Text("Manuelle Korrektur, -2000 bis +2000") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -158,11 +137,11 @@ fun AuszahlungScreen(
         Spacer(Modifier.height(16.dp))
 
         OutlinedTextField(
-            value = "€ $ausbezahlterBetrag",
+            value = "€ " + formatiereDeutscheZahl(ausbezahlterBetrag),
             onValueChange = {},
             readOnly = true,
             label = { Text("Ausbezahlter Betrag") },
-            supportingText = { Text("FIXUM/TRAININGSGELD + PUNKTE/AUFLAUFPRÄMIE − Abzug Masseur − Abzug Sonstiges + Korrektur") },
+            supportingText = { Text("Aufwandsentschädigung + Korrektur") },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -208,9 +187,7 @@ fun AuszahlungScreen(
 
         Button(
             enabled = unterschriftBase64 != null,
-            onClick = {
-                onDatenUebernehmen(bemerkung, ausbezahlterBetrag, korrektur, unterschriftBase64!!)
-            },
+            onClick = { onDatenUebernehmen(bemerkung, korrektur, unterschriftBase64!!) },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Daten übernehmen")
@@ -228,84 +205,25 @@ fun AuszahlungScreen(
 
     if (zeigeSignaturPad) {
         SignaturePad(
-            onUebernehmen = { base64 ->
-                unterschriftBase64 = base64
-                zeigeSignaturPad = false
-            },
+            onUebernehmen = { base64 -> unterschriftBase64 = base64; zeigeSignaturPad = false },
             onAbbrechen = { zeigeSignaturPad = false }
         )
     }
 }
 
 @Composable
-private fun InfoZeile(bezeichnung: String, wert: String) {
+private fun InfoZeileBetreuung(bezeichnung: String, wert: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(bezeichnung, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(wert, fontWeight = FontWeight.Medium)
     }
 }
 
-/** Ein Spieler gilt als AP-Spieler ("Auflaufprämie"), wenn sein Name "(AP)" enthält. */
-private fun istApSpieler(spieler: SpielerKosten): Boolean =
-    spieler.name.contains("(AP)", ignoreCase = true)
-
-/**
- * Basis-Betrag: normal FIXUM (roh, Spalte B), bei AP-Spielern stattdessen
- * Trainingsgeld = Spalte B × Spalte L.
- */
-private fun berechneBasisBetrag(spieler: SpielerKosten): Double {
-    val fixum = parseDeutscheZahl(spieler.fixum) ?: 0.0
-    if (!istApSpieler(spieler)) return fixum
-    val faktor = parseDeutscheZahl(spieler.trainingsgeldFaktor) ?: 0.0
-    return fixum * faktor
-}
-
-/**
- * Bonus-Betrag: normal Punkte-Betrag = Spalte D ("Punkte") × Spalte O ("Punkte pro
- * Monat"), bei AP-Spielern stattdessen Auflaufprämie = Spalte C ("AP") × Spalte N
- * ("Einsätze pro Monat").
- */
-private fun berechneBonusBetrag(spieler: SpielerKosten): Double {
-    return if (istApSpieler(spieler)) {
-        val ap = parseDeutscheZahl(spieler.ap) ?: 0.0
-        val einsaetze = parseDeutscheZahl(spieler.einsaetze) ?: 0.0
-        ap * einsaetze
-    } else {
-        val punkte = parseDeutscheZahl(spieler.punkte) ?: 0.0
-        val punkteProMonat = parseDeutscheZahl(spieler.punkteMultiplikator) ?: 0.0
-        punkte * punkteProMonat
-    }
-}
-
-/**
- * Zeigt den formatierten Euro-Betrag, falls der Rohwert aus dem Sheet als Zahl
- * gelesen werden konnte - sonst den Rohwert selbst (z.B. leer oder Text), damit
- * sofort sichtbar ist, WAS tatsächlich aus der Tabelle angekommen ist, statt
- * das still als € 0,00 zu verstecken.
- */
-private fun zeigeWertOderRoh(rohwert: String): String {
-    val zahl = parseDeutscheZahl(rohwert)
-    return if (zahl != null) "€ " + formatiereDeutscheZahl(zahl) else "(Rohwert: \"$rohwert\")"
-}
-
-/** Ausbezahlter Betrag = Basis-Betrag + Bonus-Betrag − Abzug Masseur − Abzug Sonstiges + Korrektur. */
-private fun berechneAusbezahltenBetrag(spieler: SpielerKosten?, korrekturText: String): String {
-    if (spieler == null) return ""
-    val basis = berechneBasisBetrag(spieler)
-    val bonus = berechneBonusBetrag(spieler)
-    val abzugMasseur = parseDeutscheZahl(spieler.abzugMasseur) ?: 0.0
-    val abzugSonstiges = parseDeutscheZahl(spieler.abzugSonstiges) ?: 0.0
-    val korrektur = parseDeutscheZahl(korrekturText) ?: 0.0
-    val summe = basis + bonus - abzugMasseur - abzugSonstiges + korrektur
-    return formatiereDeutscheZahl(summe)
-}
-
-/** Begrenzt die Korrektur-Eingabe auf -2000 bis +2000, erlaubt aber Zwischenzustände beim Tippen. */
-private fun begrenzeKorrektur(eingabe: String): String {
+private fun begrenzeKorrekturBetreuung(eingabe: String): String {
     val zahl = parseDeutscheZahl(eingabe) ?: return eingabe
     return when {
-        zahl > KORREKTUR_MAX -> KORREKTUR_MAX.toInt().toString()
-        zahl < KORREKTUR_MIN -> KORREKTUR_MIN.toInt().toString()
+        zahl > 2000.0 -> "2000"
+        zahl < -2000.0 -> "-2000"
         else -> eingabe
     }
 }

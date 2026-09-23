@@ -21,10 +21,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -122,27 +124,40 @@ fun MainScreen(viewModel: MainViewModel) {
                             )
                         }
 
-                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-                            SegmentedButton(
+                        ScrollableTabRow(
+                            selectedTabIndex = Ebene.entries.indexOf(zustand.aktiveEbene),
+                            edgePadding = 12.dp
+                        ) {
+                            Tab(
                                 selected = zustand.aktiveEbene == Ebene.TRAININGSLISTE,
                                 onClick = { viewModel.wechsleEbene(Ebene.TRAININGSLISTE) },
-                                shape = SegmentedButtonDefaults.itemShape(0, 4)
-                            ) { Text("Training") }
-                            SegmentedButton(
+                                text = { Text("Training") }
+                            )
+                            Tab(
                                 selected = zustand.aktiveEbene == Ebene.KOSTEN_SPIELBETRIEB,
                                 onClick = { viewModel.wechsleEbene(Ebene.KOSTEN_SPIELBETRIEB) },
-                                shape = SegmentedButtonDefaults.itemShape(1, 4)
-                            ) { Text("Kosten") }
-                            SegmentedButton(
+                                text = { Text("Kosten") }
+                            )
+                            Tab(
                                 selected = zustand.aktiveEbene == Ebene.SPIELER,
                                 onClick = { viewModel.wechsleEbene(Ebene.SPIELER) },
-                                shape = SegmentedButtonDefaults.itemShape(2, 4)
-                            ) { Text("Spieler") }
-                            SegmentedButton(
+                                text = { Text("Spieler") }
+                            )
+                            Tab(
+                                selected = zustand.aktiveEbene == Ebene.MASSEUR,
+                                onClick = { viewModel.wechsleEbene(Ebene.MASSEUR) },
+                                text = { Text("Masseur") }
+                            )
+                            Tab(
+                                selected = zustand.aktiveEbene == Ebene.BETREUUNG,
+                                onClick = { viewModel.wechsleEbene(Ebene.BETREUUNG) },
+                                text = { Text("Betreuung") }
+                            )
+                            Tab(
                                 selected = zustand.aktiveEbene == Ebene.BESTAETIGUNGEN,
                                 onClick = { viewModel.wechsleEbene(Ebene.BESTAETIGUNGEN) },
-                                shape = SegmentedButtonDefaults.itemShape(3, 4)
-                            ) { Text("Bestät.") }
+                                text = { Text("Bestätigung") }
+                            )
                         }
 
                         zustand.fehler?.let { fehlertext ->
@@ -167,10 +182,29 @@ fun MainScreen(viewModel: MainViewModel) {
                                 onDatenUebernehmen = viewModel::speichereAuszahlung,
                                 modifier = Modifier.fillMaxSize()
                             )
+                            Ebene.MASSEUR -> MasseurScreen(
+                                monat = zustand.gewaehlterMonat,
+                                alleSpieler = zustand.kostenSpielbetrieb?.spieler ?: emptyList(),
+                                gewaehlterName = zustand.gewaehlterMasseur,
+                                speichernErfolgreich = zustand.speichernErfolgreich,
+                                onAusgewaehlt = viewModel::waehleMasseur,
+                                onDatenUebernehmen = viewModel::speichereMasseurAuszahlung,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            Ebene.BETREUUNG -> BetreuungScreen(
+                                monat = zustand.gewaehlterMonat,
+                                alleSpieler = zustand.kostenSpielbetrieb?.spieler ?: emptyList(),
+                                gewaehlterName = zustand.gewaehlterBetreuer,
+                                speichernErfolgreich = zustand.speichernErfolgreich,
+                                onAusgewaehlt = viewModel::waehleBetreuer,
+                                onDatenUebernehmen = viewModel::speichereBetreuungAuszahlung,
+                                modifier = Modifier.fillMaxSize()
+                            )
                             Ebene.BESTAETIGUNGEN -> BestaetigungenScreen(
                                 bestaetigungen = zustand.bestaetigungen,
                                 fehler = zustand.bestaetigungenLadenFehler,
                                 onAktualisieren = viewModel::ladeBestaetigungen,
+                                onLoeschen = viewModel::loescheBestaetigung,
                                 ladeUnterschrift = viewModel::ladeUnterschriftBytes,
                                 modifier = Modifier.fillMaxSize()
                             )

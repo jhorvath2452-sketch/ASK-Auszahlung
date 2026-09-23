@@ -99,29 +99,54 @@ class SheetsRepository {
         }
 
         val spielerListe = mutableListOf<SpielerKosten>()
+        val bereitsErfassteZeilen = mutableSetOf<Int>()
+
+        fun baueSpieler(i: Int, name: String): SpielerKosten {
+            val zeile = werte[i]
+            return SpielerKosten(
+                zeilenNummer = i + 1,
+                name = name,
+                fixum = zeile.getOrNull(fixumIdx) ?: "",
+                ap = zeile.getOrNull(apIdx) ?: "",
+                punkte = zeile.getOrNull(punkteIdx) ?: "",
+                punkteMultiplikator = zeile.getOrNull(punkteMultIdx) ?: "",
+                abzugSonstiges = zeile.getOrNull(sonstigesIdx) ?: "",
+                abzugMasseur = zeile.getOrNull(masseurIdx) ?: "",
+                einsaetze = zeile.getOrNull(einsaetzeIdx) ?: "",
+                trainingsgeldFaktor = zeile.getOrNull(trainingsgeldFaktorIdx) ?: "",
+                masseurFaktor = zeile.getOrNull(masseurFaktorIdx) ?: "",
+                masseurEinsaetze = zeile.getOrNull(masseurEinsaetzeIdx) ?: "",
+                rohWerte = zeile
+            )
+        }
+
+        // 1. Reguläre Spieler ab der großen Detailtabelle.
         if (startZeile >= 0) {
             for (i in startZeile until werte.size) {
                 val zeile = werte[i]
                 val name = zeile.getOrNull(nameIdx)?.trim() ?: ""
                 if (name.equals("ENDE", ignoreCase = true)) break
                 if (name.isBlank()) continue
-                spielerListe.add(
-                    SpielerKosten(
-                        zeilenNummer = i + 1,
-                        name = name,
-                        fixum = zeile.getOrNull(fixumIdx) ?: "",
-                        ap = zeile.getOrNull(apIdx) ?: "",
-                        punkte = zeile.getOrNull(punkteIdx) ?: "",
-                        punkteMultiplikator = zeile.getOrNull(punkteMultIdx) ?: "",
-                        abzugSonstiges = zeile.getOrNull(sonstigesIdx) ?: "",
-                        abzugMasseur = zeile.getOrNull(masseurIdx) ?: "",
-                        einsaetze = zeile.getOrNull(einsaetzeIdx) ?: "",
-                        trainingsgeldFaktor = zeile.getOrNull(trainingsgeldFaktorIdx) ?: "",
-                        masseurFaktor = zeile.getOrNull(masseurFaktorIdx) ?: "",
-                        masseurEinsaetze = zeile.getOrNull(masseurEinsaetzeIdx) ?: "",
-                        rohWerte = zeile
-                    )
-                )
+                spielerListe.add(baueSpieler(i, name))
+                bereitsErfassteZeilen.add(i)
+            }
+        }
+
+        // 2. Masseur/Betreuung (Trainer, Wäsche) stehen oft VOR der großen
+        // Detailtabelle (z.B. in einem eigenen kleinen Block weiter oben im
+        // Sheet) und würden von Schritt 1 allein nicht erfasst. Deshalb wird
+        // zusätzlich die komplette Tabelle nach passenden Namen durchsucht.
+        for (i in werte.indices) {
+            if (i in bereitsErfassteZeilen) continue
+            val zeile = werte[i]
+            val name = zeile.getOrNull(nameIdx)?.trim() ?: ""
+            if (name.isBlank()) continue
+            val istSonderZeile = name.contains("Masseur", ignoreCase = true) ||
+                name.contains("Trainer", ignoreCase = true) ||
+                name.contains("Wäsche", ignoreCase = true)
+            if (istSonderZeile) {
+                spielerListe.add(baueSpieler(i, name))
+                bereitsErfassteZeilen.add(i)
             }
         }
 

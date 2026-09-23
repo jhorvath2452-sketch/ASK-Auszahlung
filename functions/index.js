@@ -18,6 +18,7 @@
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 // Bewusst das schlanke @googleapis/sheets-Paket statt des riesigen
 // "googleapis"-Gesamtpakets: Letzteres deckt praktisch alle Google-APIs ab
 // und braucht beim Laden (require) oft mehrere Sekunden - unter Windows
@@ -88,3 +89,34 @@ exports.sheetsProxy = onCall({ region: 'europe-west1' }, async (request) => {
   // Unerreichbar, da ERLAUBTE_AKTIONEN nur die beiden obigen Fälle enthält.
   throw new HttpsError('invalid-argument', 'Unbekannte Aktion.');
 });
+
+/**
+ * Löst automatisch eine Push-Benachrichtigung an alle Geräte aus, die das
+ * Thema "neue_bestaetigungen" abonniert haben (macht die App beim Start,
+ * siehe MainActivity.kt), sobald ein NEUES Dokument in der Firestore-
+ * Sammlung "auszahlungen" angelegt wird. Reagiert bewusst nur auf "create"
+ * (onDocumentCreated), nicht auf "update" - das weiche Löschen (Papierkorb,
+ * setzt nur "geloeschtAm") löst also KEINE Benachrichtigung aus.
+ */
+exports.benachrichtigeNeueBestaetigung = onDocumentCreated(
+  { document: 'auszahlungen/{dokumentId}', region: 'europe-west1' },
+  async (event) => {
+    const daten = event.data?.data();
+    if (!daten) return;
+
+    const spieler = daten.spielerName || 'Unbekannt';
+    const monat = daten.monat || '';
+
+    try {
+      await admin.messaging().send({
+        topic: 'neue_bestaetigungen',
+        notification: {
+          title: 'Neue Auszahlungsbestätigung',
+          body: `${spieler} – ${monat}`.trim(),
+        },
+      });
+    } catch (e) {
+      console.error('Push-Benachrichtigung fehlgeschlagen', e);
+    }
+  }
+);

@@ -1,12 +1,18 @@
 package at.mannersdorf.ask.auszahlung
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
 import at.mannersdorf.ask.auszahlung.ui.MainScreen
 import at.mannersdorf.ask.auszahlung.ui.theme.AuszahlungAppTheme
 import at.mannersdorf.ask.auszahlung.viewmodel.MainViewModel
+import com.google.firebase.messaging.FirebaseMessaging
 
 class MainActivity : ComponentActivity() {
 
@@ -14,12 +20,33 @@ class MainActivity : ComponentActivity() {
         MainViewModel.Factory(applicationContext)
     }
 
+    private val benachrichtigungsBerechtigungAnfrage =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* egal ob ja/nein - Themenabo geht so oder so */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        erstelleBenachrichtigungskanal(this)
+        stelleBenachrichtigungsBerechtigungSicher()
+        // Alle Geräte abonnieren gemeinsam dasselbe Thema statt einzelne
+        // Token zu verwalten - die Cloud Function sendet neue Bestätigungen
+        // einfach an "neue_bestaetigungen" (siehe /functions).
+        FirebaseMessaging.getInstance().subscribeToTopic(PUSH_THEMA)
 
         setContent {
             AuszahlungAppTheme {
                 MainScreen(viewModel = viewModel)
+            }
+        }
+    }
+
+    private fun stelleBenachrichtigungsBerechtigungSicher() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val bereitsErteilt = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!bereitsErteilt) {
+                benachrichtigungsBerechtigungAnfrage.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
     }

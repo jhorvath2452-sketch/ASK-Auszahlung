@@ -146,7 +146,7 @@ fun TrainingslisteScreen(daten: TrainingslisteDaten?, modifier: Modifier = Modif
                                     wert = wert,
                                     istNamensSpalte = spaltenIndex == 0,
                                     erzwingeFett = istTrainingMatchZeile || istLetzteZeile,
-                                    zahltHansFeld = wert.contains("zahlt Hans", ignoreCase = true)
+                                    zahltHansFeld = istZahltHansFeld(wert)
                                 )
                             }
                         }
@@ -154,16 +154,6 @@ fun TrainingslisteScreen(daten: TrainingslisteDaten?, modifier: Modifier = Modif
                 }
             }
         }
-    }
-}
-
-/** Namen mit "**" am Ende -> 2, mit einem "*" -> 1, sonst 0. */
-private fun sternAnzahl(text: String): Int {
-    val getrimmt = text.trim()
-    return when {
-        getrimmt.endsWith("**") -> 2
-        getrimmt.endsWith("*") -> 1
-        else -> 0
     }
 }
 

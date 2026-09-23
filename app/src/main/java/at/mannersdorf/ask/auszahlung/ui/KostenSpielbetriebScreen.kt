@@ -37,6 +37,7 @@ private val NAMENSSPALTENBREITE = 168.dp
 private const val SUMMENZEILEN_MARKIERUNG = "SUMME"
 private val MarkierGelb = Color(0xFFFFF59D)
 private val MarkierRot = Color(0xFFFFCDD2)
+private val MarkierOrange = Color(0xFFFFE0B2)
 
 // Feste Spalten für die 5 Summen im Abschluss, wie im Sheet: E, F, H, I, J
 // (0-basiert: A=0, B=1, ... E=4, F=5, G=6, H=7, I=8, J=9).
@@ -58,8 +59,9 @@ private val EURO_SUMMEN_SPALTEN = setOf(SUMME_SPALTE_E, SUMME_SPALTE_F)
  * jeweils direkt darauffolgende Zeile. Komplett leere Zeilen erzeugen einen
  * Leerraum. "Freie Zeile"-Spielerzeilen und die Gegner-Spalten (P/R/T/V mit
  * "Gegner 1"-"Gegner 4", Q/S/U/W mit "x") lassen sich über je einen Schalter
- * ausblenden - inhaltsbasiert, siehe SpaltenErkennung.kt. Namen, die auf "*" enden, markieren die ganze
- * Zeile rot (siehe Legende "* KEINE AUSZAHLUNG"). Nach der letzten Spielerzeile
+ * ausblenden - inhaltsbasiert, siehe SpaltenErkennung.kt. Namen, die auf ein
+ * "*" enden, markieren die ganze Zeile rot ("* KEINE AUSZAHLUNG"), auf "**"
+ * hell-orange (die Zelle mit dem Text "zahlt Hans" ebenfalls). Nach der letzten Spielerzeile
  * wird ein grüner Abschluss mit 5 Summen (Spalten E, F, H, I, J) eingefügt -
  * nur zur Anzeige, wird nicht ins Sheet zurückgeschrieben. Antippen einer
  * Datenzeile markiert sie hellgelb (nochmals antippen hebt die Markierung
@@ -130,7 +132,7 @@ fun KostenSpielbetriebScreen(daten: KostenSpielbetriebDaten?, modifier: Modifier
                             freieSpaltenAusblenden = freieSpaltenAusblenden,
                             auszublendendeSpalten = auszublendendeSpalten,
                             markiert = zeilenSchluessel in markierteZeilen,
-                            keineAuszahlung = istKeineAuszahlungZeile(zeile),
+                            keineAuszahlung = keineAuszahlungFarbe(zeile),
                             onKlick = {
                                 markierteZeilen = if (zeilenSchluessel in markierteZeilen) {
                                     markierteZeilen - zeilenSchluessel
@@ -166,9 +168,15 @@ private fun istKostenSpielbetriebBanner(zeile: List<String>): Boolean =
 private fun istFreieZeile(zeile: List<String>): Boolean =
     zeile.getOrNull(0)?.contains("freie Zeile", ignoreCase = true) == true
 
-/** Name endet auf "*" -> komplette Zeile rot markieren ("KEINE AUSZAHLUNG"). */
-private fun istKeineAuszahlungZeile(zeile: List<String>): Boolean =
-    zeile.getOrNull(0)?.trim()?.endsWith("*") == true
+/** Name endet auf genau ein "*" -> Zeile rot ("KEINE AUSZAHLUNG"). Endet auf "**" -> Zeile hell-orange. */
+private fun keineAuszahlungFarbe(zeile: List<String>): Color? {
+    val name = zeile.getOrNull(0) ?: return null
+    return when (sternAnzahl(name)) {
+        1 -> MarkierRot
+        2 -> MarkierOrange
+        else -> null
+    }
+}
 
 /**
  * Sucht die große Detail-Kopfzeile (Name/Fixkosten/…) und summiert die Spalten
@@ -244,11 +252,11 @@ private fun DatenZeile(
     freieSpaltenAusblenden: Boolean,
     auszublendendeSpalten: Set<Int>,
     markiert: Boolean,
-    keineAuszahlung: Boolean,
+    keineAuszahlung: Color?,
     onKlick: () -> Unit
 ) {
     val hintergrund = when {
-        keineAuszahlung -> MarkierRot
+        keineAuszahlung != null -> keineAuszahlung
         markiert -> MarkierGelb
         else -> Color.Transparent
     }
@@ -262,6 +270,7 @@ private fun DatenZeile(
                 Modifier
                     .width(if (index == 0) NAMENSSPALTENBREITE else SPALTENBREITE)
                     .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                    .background(if (istZahltHansFeld(wert)) MarkierOrange else Color.Transparent)
                     .padding(6.dp)
             ) {
                 Text(wert, style = MaterialTheme.typography.bodySmall, maxLines = 1, softWrap = false)

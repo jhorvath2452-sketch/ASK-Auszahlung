@@ -108,13 +108,18 @@ exports.benachrichtigeNeueBestaetigung = onDocumentCreated(
     const monat = daten.monat || '';
 
     try {
+      // Bewusst eine REINE Datennachricht (kein "notification"-Block): Bei
+      // einer "notification"-Nachricht zeigt Android die Benachrichtigung
+      // selbst an, sobald die App im Hintergrund/geschlossen ist - dabei wird
+      // der eigene Öffnen-Code der App (mit der Dokument-ID) übersprungen und
+      // stattdessen der App-Standard-Start verwendet. Eine Datennachricht
+      // landet dagegen IMMER in onMessageReceived, egal in welchem Zustand
+      // die App gerade ist.
       await admin.messaging().send({
         topic: 'neue_bestaetigungen',
-        notification: {
-          title: 'Neue Auszahlungsbestätigung',
-          body: `${spieler} – ${monat}`.trim(),
-        },
         data: {
+          titel: 'Neue Auszahlungsbestätigung',
+          text: `${spieler} – ${monat}`.trim(),
           dokumentId: event.params.dokumentId,
         },
       });

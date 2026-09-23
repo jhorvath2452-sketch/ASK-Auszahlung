@@ -15,17 +15,22 @@ const val PUSH_THEMA = "neue_bestaetigungen"
 const val PUSH_EXTRA_BESTAETIGUNG_ID = "bestaetigungId"
 
 /**
- * Empfängt Push-Benachrichtigungen (Firebase Cloud Messaging) und zeigt sie an -
- * auch wenn die App gerade offen ist (FCM zeigt "notification"-Nachrichten sonst
- * nur an, wenn die App im Hintergrund/geschlossen ist). Ausgelöst wird das von
+ * Empfängt Push-Benachrichtigungen (Firebase Cloud Messaging) und zeigt sie
+ * selbst an - bewusst als reine Datennachricht (siehe Cloud Function), damit
+ * dieser Code IMMER läuft und beim Antippen zuverlässig die richtige
+ * Bestätigung öffnet, statt vom System mit dem App-Standardstart übersprungen
+ * zu werden. Ausgelöst wird das von
  * der Cloud Function "sheetsProxy"-Nachbarfunktion, sobald eine neue Bestätigung
  * in Firestore gespeichert wird (siehe /functions).
  */
 class PushNachrichtenDienst : FirebaseMessagingService() {
 
+    // Reine Datennachricht (siehe Cloud Function) - onMessageReceived wird
+    // dadurch IMMER aufgerufen (Vordergrund, Hintergrund UND komplett
+    // geschlossene App), nie vom System automatisch übersprungen.
     override fun onMessageReceived(nachricht: RemoteMessage) {
-        val titel = nachricht.notification?.title ?: "ASK Auszahlung"
-        val text = nachricht.notification?.body ?: "Neue Bestätigung gespeichert."
+        val titel = nachricht.data["titel"] ?: "ASK Auszahlung"
+        val text = nachricht.data["text"] ?: "Neue Bestätigung gespeichert."
         val dokumentId = nachricht.data["dokumentId"]
         zeigeBenachrichtigung(this, titel, text, dokumentId)
     }

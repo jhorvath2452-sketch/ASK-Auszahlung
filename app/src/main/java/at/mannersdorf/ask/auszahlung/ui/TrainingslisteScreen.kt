@@ -63,18 +63,15 @@ private val WOCHENTAGE = setOf("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
 private val TRAINING_MATCH_KUERZEL = setOf("1", "M")
 private val DATUMS_MUSTER = Regex("""\d{1,2}[./]\d{1,2}""")
 
-// "Gegner 1"-"Gegner 4" stehen (falls vorhanden) in Spalte P, R, T, V; die
-// zugehörige "x"-Markierung in der jeweils direkt folgenden Zeile bei
-// Spalte Q, S, U, W (0-basiert: P=15, Q=16, R=17, S=18, T=19, U=20, V=21, W=22).
-private val GEGNER_SPALTEN = listOf(15 to "Gegner 1", 17 to "Gegner 2", 19 to "Gegner 3", 21 to "Gegner 4")
-private val X_SPALTEN = listOf(16, 18, 20, 22)
+// "Gegner 1"-"Gegner 4" / "Spalten ausblenden"-Logik: siehe SpaltenErkennung.kt
+// (von Training UND Kosten Spielbetrieb gemeinsam genutzt).
 
 /**
  * Ebene 1: zeigt die Trainingsliste (Spalte A–AM) für den gewählten Monat, wie
  * im Google Sheet. Namen mit einem "*" am Ende markieren die ganze Zeile rot,
  * mit "**" hell-orange. Die Zelle mit dem Text "zahlt Hans" wird ebenfalls
- * hell-orange hervorgehoben. Die letzte Zeile ist immer grün mit weißer,
- * fetter Schrift. Antippen einer Zeile markiert sie hellgelb (nochmals
+ * hell-orange hervorgehoben. Die letzte Zeile ist immer hellgrün (wie die
+ * helle Zebra-Streifen-Farbe) mit fetter Schrift. Antippen einer Zeile markiert sie hellgelb (nochmals
  * antippen hebt die Markierung wieder auf). Über "Spalten ausblenden" lassen
  * sich die Gegner-Spalten P/R/T/V ausblenden, wenn dort tatsächlich
  * "Gegner 1"-"Gegner 4" steht (und die zugehörige "x"-Spalte Q/S/U/W).
@@ -125,7 +122,7 @@ fun TrainingslisteScreen(daten: TrainingslisteDaten?, modifier: Modifier = Modif
                         val sterne = sternAnzahl(ersteZelle)
 
                         val hintergrund = when {
-                            istLetzteZeile -> MaterialTheme.colorScheme.primary
+                            istLetzteZeile -> MaterialTheme.colorScheme.surfaceVariant
                             sterne == 1 -> MarkierRot
                             sterne == 2 -> MarkierOrange
                             zeilenSchluessel in markierteZeilen -> MarkierGelb
@@ -144,12 +141,11 @@ fun TrainingslisteScreen(daten: TrainingslisteDaten?, modifier: Modifier = Modif
                                     }
                                 }
                         ) {
-                            sichtbareSpalten(zeile.werte, spaltenAusblenden, auszublendendeSpalten).forEach { (spaltenIndex, wert) ->
+                            sichtbareSpaltenIndiziert(zeile.werte, spaltenAusblenden, auszublendendeSpalten).forEach { (spaltenIndex, wert) ->
                                 ZellenText(
                                     wert = wert,
                                     istNamensSpalte = spaltenIndex == 0,
                                     erzwingeFett = istTrainingMatchZeile || istLetzteZeile,
-                                    erzwingeWeiss = istLetzteZeile,
                                     zahltHansFeld = wert.contains("zahlt Hans", ignoreCase = true)
                                 )
                             }
@@ -171,47 +167,6 @@ private fun sternAnzahl(text: String): Int {
     }
 }
 
-/**
- * Sucht die Zeile, in der Spalte P ("Gegner 1") steht, prüft dort auch
- * R/T/V auf "Gegner 2"-"Gegner 4", und in der direkt darauffolgenden Zeile
- * Q/S/U/W auf "x". Liefert die Spaltenindizes, die beim Ausblenden
- * verschwinden sollen. Inhaltsbasiert (nicht über feste Zeilennummern), damit
- * das auch nach dem Überspringen von Bannerzeilen zuverlässig funktioniert.
- */
-private fun ermittleAuszublendendeSpalten(zeilen: List<List<String>>): Set<Int> {
-    val gegnerIndex = zeilen.indexOfFirst { zeile ->
-        zeile.getOrNull(15)?.trim()?.equals("Gegner 1", ignoreCase = true) == true
-    }
-    if (gegnerIndex < 0) return emptySet()
-
-    val ergebnis = mutableSetOf<Int>()
-    val gegnerZeile = zeilen[gegnerIndex]
-    for ((spaltenIndex, erwarteterText) in GEGNER_SPALTEN) {
-        if (gegnerZeile.getOrNull(spaltenIndex)?.trim()?.equals(erwarteterText, ignoreCase = true) == true) {
-            ergebnis.add(spaltenIndex)
-        }
-    }
-
-    val xIndex = gegnerIndex + 1
-    if (xIndex < zeilen.size) {
-        val xZeile = zeilen[xIndex]
-        for (spaltenIndex in X_SPALTEN) {
-            if (xZeile.getOrNull(spaltenIndex)?.trim()?.equals("x", ignoreCase = true) == true) {
-                ergebnis.add(spaltenIndex)
-            }
-        }
-    }
-    return ergebnis
-}
-
-private fun sichtbareSpalten(
-    zeile: List<String>,
-    ausblenden: Boolean,
-    auszublendendeSpalten: Set<Int>
-): List<IndexedValue<String>> {
-    val indiziert = zeile.withIndex().toList()
-    return if (ausblenden) indiziert.filter { it.index !in auszublendendeSpalten } else indiziert
-}
 
 /**
  * Info-Button + Kürzel-Erklärungs-Dialog für die Trainingsliste, eigenständig
@@ -249,7 +204,7 @@ fun TrainingsInfoButton(modifier: Modifier = Modifier) {
 @Composable
 private fun HeaderZeile(kopfzeile: List<String>, spaltenAusblenden: Boolean, auszublendendeSpalten: Set<Int>) {
     Row(Modifier.background(MaterialTheme.colorScheme.primary)) {
-        sichtbareSpalten(kopfzeile, spaltenAusblenden, auszublendendeSpalten).forEach { (index, titel) ->
+        sichtbareSpaltenIndiziert(kopfzeile, spaltenAusblenden, auszublendendeSpalten).forEach { (index, titel) ->
             Box(
                 Modifier
                     .width(if (index == 0) NAMENSSPALTENBREITE else SPALTENBREITE)

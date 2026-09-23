@@ -12,6 +12,7 @@ import com.google.firebase.messaging.RemoteMessage
 
 private const val BENACHRICHTIGUNGSKANAL_ID = "neue_bestaetigungen"
 const val PUSH_THEMA = "neue_bestaetigungen"
+const val PUSH_EXTRA_BESTAETIGUNG_ID = "bestaetigungId"
 
 /**
  * Empfängt Push-Benachrichtigungen (Firebase Cloud Messaging) und zeigt sie an -
@@ -25,7 +26,8 @@ class PushNachrichtenDienst : FirebaseMessagingService() {
     override fun onMessageReceived(nachricht: RemoteMessage) {
         val titel = nachricht.notification?.title ?: "ASK Auszahlung"
         val text = nachricht.notification?.body ?: "Neue Bestätigung gespeichert."
-        zeigeBenachrichtigung(this, titel, text)
+        val dokumentId = nachricht.data["dokumentId"]
+        zeigeBenachrichtigung(this, titel, text, dokumentId)
     }
 
     // Ein neues Geräte-Token braucht die App nicht extra zu speichern, da alle
@@ -48,16 +50,20 @@ fun erstelleBenachrichtigungskanal(context: Context) {
     }
 }
 
-fun zeigeBenachrichtigung(context: Context, titel: String, text: String) {
+fun zeigeBenachrichtigung(context: Context, titel: String, text: String, dokumentId: String?) {
     val oeffneIntent = Intent(context, MainActivity::class.java).apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        if (dokumentId != null) {
+            putExtra(PUSH_EXTRA_BESTAETIGUNG_ID, dokumentId)
+        }
     }
     val pendingIntentFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     } else {
         PendingIntent.FLAG_UPDATE_CURRENT
     }
-    val pendingIntent = PendingIntent.getActivity(context, 0, oeffneIntent, pendingIntentFlags)
+    val benachrichtigungsId = System.currentTimeMillis().toInt()
+    val pendingIntent = PendingIntent.getActivity(context, benachrichtigungsId, oeffneIntent, pendingIntentFlags)
 
     val benachrichtigung = NotificationCompat.Builder(context, BENACHRICHTIGUNGSKANAL_ID)
         .setSmallIcon(R.drawable.ic_launcher_foreground)
@@ -69,5 +75,5 @@ fun zeigeBenachrichtigung(context: Context, titel: String, text: String) {
         .build()
 
     val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    manager.notify(System.currentTimeMillis().toInt(), benachrichtigung)
+    manager.notify(benachrichtigungsId, benachrichtigung)
 }

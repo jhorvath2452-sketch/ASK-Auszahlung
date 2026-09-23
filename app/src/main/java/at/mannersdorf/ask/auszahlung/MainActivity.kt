@@ -1,6 +1,7 @@
 package at.mannersdorf.ask.auszahlung
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -33,10 +34,26 @@ class MainActivity : ComponentActivity() {
         // einfach an "neue_bestaetigungen" (siehe /functions).
         FirebaseMessaging.getInstance().subscribeToTopic(PUSH_THEMA)
 
+        behandleBenachrichtigungsIntent(intent)
+
         setContent {
             AuszahlungAppTheme {
                 MainScreen(viewModel = viewModel)
             }
+        }
+    }
+
+    // Wird aufgerufen, wenn die App schon läuft und eine Benachrichtigung
+    // angetippt wird (onCreate läuft dann NICHT erneut).
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        behandleBenachrichtigungsIntent(intent)
+    }
+
+    private fun behandleBenachrichtigungsIntent(intent: Intent?) {
+        val bestaetigungId = intent?.getStringExtra(PUSH_EXTRA_BESTAETIGUNG_ID)
+        if (bestaetigungId != null) {
+            viewModel.oeffneBestaetigungAusPush(bestaetigungId)
         }
     }
 

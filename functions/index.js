@@ -114,6 +114,9 @@ exports.benachrichtigeNeueBestaetigung = onDocumentCreated(
           title: 'Neue Auszahlungsbestätigung',
           body: `${spieler} – ${monat}`.trim(),
         },
+        data: {
+          dokumentId: event.params.dokumentId,
+        },
       });
     } catch (e) {
       console.error('Push-Benachrichtigung fehlgeschlagen', e);

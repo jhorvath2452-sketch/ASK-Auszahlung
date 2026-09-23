@@ -14,6 +14,7 @@ import at.mannersdorf.ask.auszahlung.data.model.SpaltenZuordnung
 import at.mannersdorf.ask.auszahlung.data.model.TrainingslisteDaten
 import at.mannersdorf.ask.auszahlung.data.model.istBetreuung
 import at.mannersdorf.ask.auszahlung.data.model.istMasseur
+import at.mannersdorf.ask.auszahlung.data.model.istTormanntrainer
 import at.mannersdorf.ask.auszahlung.data.parseDeutscheZahl
 import at.mannersdorf.ask.auszahlung.data.formatiereDeutscheZahl
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +25,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class Ebene { TRAININGSLISTE, KOSTEN_SPIELBETRIEB, SPIELER, MASSEUR, BETREUUNG, BESTAETIGUNGEN }
+enum class Ebene { TRAININGSLISTE, KOSTEN_SPIELBETRIEB, SPIELER, MASSEUR, TORMANNTRAINER, BETREUUNG, BESTAETIGUNGEN }
 
 data class HauptZustand(
     /** true, sobald die anonyme Firebase-Anmeldung + der erste Datenabruf durch sind. */
@@ -46,6 +47,7 @@ data class HauptZustand(
 
     val gewaehlterSpieler: String? = null,
     val gewaehlterMasseur: String? = null,
+    val gewaehlterTormanntrainer: String? = null,
     val gewaehlterBetreuer: String? = null,
     val speichernErfolgreich: Boolean = false,
     val trainingslisteSheetId: String = "",
@@ -55,7 +57,11 @@ data class HauptZustand(
 
     // Ebene 4: bereits gespeicherte Bestätigungen (aus Firestore).
     val bestaetigungen: List<GespeicherteBestaetigung> = emptyList(),
-    val bestaetigungenLadenFehler: String? = null
+    val bestaetigungenLadenFehler: String? = null,
+
+    // Gesetzt, wenn die App über eine Push-Benachrichtigung geöffnet wurde -
+    // dann soll die betreffende Bestätigung automatisch als PDF geöffnet werden.
+    val ausPushZuOeffnendeBestaetigungId: String? = null
 )
 
 /**
@@ -179,11 +185,13 @@ class MainViewModel(private val context: Context) : ViewModel() {
             val daten = sheetsRepository.leseKostenSpielbetrieb(sheetId, monat, spalten)
             val ersterSpieler = daten.spieler.firstOrNull()?.name
             val ersterMasseur = daten.spieler.firstOrNull { it.istMasseur() }?.name
+            val ersterTormanntrainer = daten.spieler.firstOrNull { it.istTormanntrainer() }?.name
             val ersterBetreuer = daten.spieler.firstOrNull { it.istBetreuung() }?.name
             _zustand.value = _zustand.value.copy(
                 kostenSpielbetrieb = daten,
                 gewaehlterSpieler = ersterSpieler,
                 gewaehlterMasseur = ersterMasseur,
+                gewaehlterTormanntrainer = ersterTormanntrainer,
                 gewaehlterBetreuer = ersterBetreuer,
                 fehler = null
             )
@@ -200,6 +208,10 @@ class MainViewModel(private val context: Context) : ViewModel() {
 
     fun waehleMasseur(name: String) {
         _zustand.value = _zustand.value.copy(gewaehlterMasseur = name, speichernErfolgreich = false)
+    }
+
+    fun waehleTormanntrainer(name: String) {
+        _zustand.value = _zustand.value.copy(gewaehlterTormanntrainer = name, speichernErfolgreich = false)
     }
 
     fun waehleBetreuer(name: String) {
@@ -303,6 +315,30 @@ class MainViewModel(private val context: Context) : ViewModel() {
         )
     }
 
+    /** Aufwandsentschädigung für Tormanntrainer extra = Spalte C ("Einsätze pro Monat") × Spalte F ("€ pro Anwesenheit") - gleiche Formel wie Masseur. */
+    fun speichereTormanntrainerAuszahlung(
+        bemerkung: String,
+        korrektur: String,
+        unterschriftPngBase64: String
+    ) {
+        val z = _zustand.value
+        val spieler = z.kostenSpielbetrieb?.spieler?.find { it.name == z.gewaehlterTormanntrainer } ?: return
+        val einsaetze = parseDeutscheZahl(spieler.ap) ?: 0.0
+        val satzProAnwesenheit = parseDeutscheZahl(spieler.masseurFaktor) ?: 0.0
+        val aufwandsentschaedigung = einsaetze * satzProAnwesenheit
+        val korrekturZahl = parseDeutscheZahl(korrektur) ?: 0.0
+        val betrag = aufwandsentschaedigung + korrekturZahl
+
+        speichereEinfacheAuszahlung(
+            spielerName = spieler.name,
+            fixumFeld = formatiereDeutscheZahl(aufwandsentschaedigung),
+            korrektur = korrektur,
+            betragErhalten = formatiereDeutscheZahl(betrag),
+            bemerkung = bemerkung,
+            unterschriftPngBase64 = unterschriftPngBase64
+        )
+    }
+
     /** Aufwandsentschädigung für Betreuung (Trainer/Wäsche) = Fixkosten (Spalte B), unverändert. */
     fun speichereBetreuungAuszahlung(
         bemerkung: String,
@@ -377,6 +413,23 @@ class MainViewModel(private val context: Context) : ViewModel() {
             setLaden(false)
         }
     }
+
+    /** Von MainActivity aufgerufen, wenn die App über eine Push-Benachrichtigung geöffnet wurde. */
+    fun oeffneBestaetigungAusPush(id: String) {
+        _zustand.value = _zustand.value.copy(
+            ausPushZuOeffnendeBestaetigungId = id,
+            aktiveEbene = Ebene.BESTAETIGUNGEN
+        )
+    }
+
+    /** Nachdem das PDF geöffnet/geteilt wurde, den Zustand wieder zurücksetzen. */
+    fun bestaetigungAusPushGeoeffnet() {
+        _zustand.value = _zustand.value.copy(ausPushZuOeffnendeBestaetigungId = null)
+    }
+
+    /** Lädt eine einzelne Bestätigung per ID (für das automatische Öffnen aus einer Push-Benachrichtigung). */
+    suspend fun ladeBestaetigungFuerPush(id: String): GespeicherteBestaetigung? =
+        firebaseRepository.leseBestaetigung(id).getOrNull()
 
     private fun setLaden(v: Boolean) {
         _zustand.value = _zustand.value.copy(ladeVorgang = v)

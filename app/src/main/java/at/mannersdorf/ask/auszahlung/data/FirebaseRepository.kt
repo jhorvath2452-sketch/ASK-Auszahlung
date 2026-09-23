@@ -164,6 +164,37 @@ class FirebaseRepository {
         }
     }
 
+    /** Lädt eine einzelne Bestätigung per ID (z.B. zum Öffnen aus einer Push-Benachrichtigung). */
+    suspend fun leseBestaetigung(id: String): Result<GespeicherteBestaetigung> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                val dokument = firestore.collection("auszahlungen").document(id).get().await()
+                if (!dokument.exists()) {
+                    return@withContext Result.failure(NoSuchElementException("Bestätigung nicht gefunden."))
+                }
+                Result.success(
+                    GespeicherteBestaetigung(
+                        id = dokument.id,
+                        monat = dokument.getString("monat") ?: "",
+                        spielerName = dokument.getString("spielerName") ?: "",
+                        fixum = dokument.getString("fixum") ?: "",
+                        punkte = dokument.getString("punkte") ?: "",
+                        abzugSonstiges = dokument.getString("abzugSonstiges") ?: "",
+                        abzugMasseur = dokument.getString("abzugMasseur") ?: "",
+                        korrektur = dokument.getString("korrektur") ?: "0",
+                        bemerkung = dokument.getString("bemerkung") ?: "",
+                        betragErhalten = dokument.getString("betragErhalten") ?: "",
+                        unterschriftUrl = dokument.getString("unterschriftUrl") ?: "",
+                        erstelltAm = dokument.getString("erstelltAm") ?: "",
+                        geloeschtAm = dokument.getLong("geloeschtAm")
+                    )
+                )
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     /** Lädt die Unterschrift-PNG-Bytes über die Firebase-Storage-Download-URL. */
     suspend fun leseUnterschriftBytes(unterschriftUrl: String): Result<ByteArray> =
         withContext(Dispatchers.IO) {

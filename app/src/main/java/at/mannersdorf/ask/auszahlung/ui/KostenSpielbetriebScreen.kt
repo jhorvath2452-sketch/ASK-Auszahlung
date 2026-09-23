@@ -47,16 +47,18 @@ private const val SUMME_SPALTE_I = 8
 private const val SUMME_SPALTE_J = 9
 private val EURO_SUMMEN_SPALTEN = setOf(SUMME_SPALTE_E, SUMME_SPALTE_F)
 
-// "Freie Spalten" P bis W (0-basiert: P=15 ... W=22), ausblendbar per Schalter.
-private val FREIE_SPALTEN = 15..22
+// "Freie Spalten ausblenden" nutzt dieselbe dynamische Gegner-1..4/x-Erkennung
+// wie die Trainingsliste (siehe SpaltenErkennung.kt), nicht mehr einen festen
+// Spaltenbereich.
 
 /**
  * Ebene 2: zeigt "Kosten Spielbetrieb" optisch an das Google Sheet angelehnt.
  * Zeilen, deren erste Zelle "Name" und zweite Zelle "Fixkosten" enthält, werden
  * als dunkelgrüner Balken mit weißer, fetter Schrift dargestellt - ebenso die
  * jeweils direkt darauffolgende Zeile. Komplett leere Zeilen erzeugen einen
- * Leerraum. "Freie Zeile"-Spielerzeilen und die Spalten P-W lassen sich über
- * je einen Schalter ausblenden. Namen, die auf "*" enden, markieren die ganze
+ * Leerraum. "Freie Zeile"-Spielerzeilen und die Gegner-Spalten (P/R/T/V mit
+ * "Gegner 1"-"Gegner 4", Q/S/U/W mit "x") lassen sich über je einen Schalter
+ * ausblenden - inhaltsbasiert, siehe SpaltenErkennung.kt. Namen, die auf "*" enden, markieren die ganze
  * Zeile rot (siehe Legende "* KEINE AUSZAHLUNG"). Nach der letzten Spielerzeile
  * wird ein grüner Abschluss mit 5 Summen (Spalten E, F, H, I, J) eingefügt -
  * nur zur Anzeige, wird nicht ins Sheet zurückgeschrieben. Antippen einer
@@ -77,13 +79,13 @@ fun KostenSpielbetriebScreen(daten: KostenSpielbetriebDaten?, modifier: Modifier
     var markierteZeilen by remember { mutableStateOf(setOf<Int>()) }
 
     val alleZeilen = remember(daten) { fuegeSummenzeileEin(daten.rohZeilen) }
-    val sichtbareZeilen = if (freieZeilenAusblenden) {
-        alleZeilen.filterIndexed { _, zeile -> !istFreieZeile(zeile) }
-    } else {
-        alleZeilen
+    val sichtbareZeilen = alleZeilen.filter { zeile ->
+        !istKostenSpielbetriebBanner(zeile) && (!freieZeilenAusblenden || !istFreieZeile(zeile))
     }
+    val auszublendendeSpalten = remember(daten) { ermittleAuszublendendeSpalten(daten.rohZeilen) }
 
     val scrollZustand = rememberScrollState()
+    val letzterNichtLeererIndex = sichtbareZeilen.indexOfLast { !istKomplettLeer(it) }
     Column(modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
@@ -120,12 +122,13 @@ fun KostenSpielbetriebScreen(daten: KostenSpielbetriebDaten?, modifier: Modifier
                     val zeilenSchluessel = zeile.hashCode()
                     when {
                         istKomplettLeer(zeile) -> Box(Modifier.height(20.dp))
-                        istKopfzeile(zeile) -> KopfzeilenBalken(zeile, freieSpaltenAusblenden)
-                        vorherigeZeile != null && istKopfzeile(vorherigeZeile) -> KopfzeilenBalken(zeile, freieSpaltenAusblenden)
-                        istSummenzeile(zeile) -> Summenzeile(zeile, freieSpaltenAusblenden)
+                        istKopfzeile(zeile) -> KopfzeilenBalken(zeile, freieSpaltenAusblenden, auszublendendeSpalten)
+                        vorherigeZeile != null && istKopfzeile(vorherigeZeile) -> KopfzeilenBalken(zeile, freieSpaltenAusblenden, auszublendendeSpalten)
+                        istSummenzeile(zeile) || index == letzterNichtLeererIndex -> Summenzeile(zeile, freieSpaltenAusblenden, auszublendendeSpalten)
                         else -> DatenZeile(
                             zeile = zeile,
                             freieSpaltenAusblenden = freieSpaltenAusblenden,
+                            auszublendendeSpalten = auszublendendeSpalten,
                             markiert = zeilenSchluessel in markierteZeilen,
                             keineAuszahlung = istKeineAuszahlungZeile(zeile),
                             onKlick = {
@@ -151,8 +154,14 @@ private fun istKopfzeile(zeile: List<String>): Boolean {
     return erste.equals("Name", ignoreCase = true) && zweite.contains("Fixkosten", ignoreCase = true)
 }
 
-private fun istSummenzeile(zeile: List<String>): Boolean =
-    zeile.getOrNull(0)?.trim() == SUMMENZEILEN_MARKIERUNG
+private fun istSummenzeile(zeile: List<String>): Boolean {
+    val erste = zeile.getOrNull(0)?.trim() ?: return false
+    return erste == SUMMENZEILEN_MARKIERUNG || erste.equals("SUMMENZEILE", ignoreCase = true)
+}
+
+/** Sub-Banner "KOSTEN SPIELBETRIEB" (kommt manchmal direkt vor der Summenzeile im Sheet vor) - wird nicht angezeigt. */
+private fun istKostenSpielbetriebBanner(zeile: List<String>): Boolean =
+    zeile.getOrNull(0)?.trim()?.equals("KOSTEN SPIELBETRIEB", ignoreCase = true) == true
 
 private fun istFreieZeile(zeile: List<String>): Boolean =
     zeile.getOrNull(0)?.contains("freie Zeile", ignoreCase = true) == true
@@ -160,12 +169,6 @@ private fun istFreieZeile(zeile: List<String>): Boolean =
 /** Name endet auf "*" -> komplette Zeile rot markieren ("KEINE AUSZAHLUNG"). */
 private fun istKeineAuszahlungZeile(zeile: List<String>): Boolean =
     zeile.getOrNull(0)?.trim()?.endsWith("*") == true
-
-/** Blendet die Spalten P-W aus, falls gewünscht - für Kopf-, Daten- und Summenzeilen gleichermaßen. */
-private fun sichtbareSpalten(zeile: List<String>, freieSpaltenAusblenden: Boolean): List<IndexedValue<String>> {
-    val indiziert = zeile.withIndex().toList()
-    return if (freieSpaltenAusblenden) indiziert.filter { it.index !in FREIE_SPALTEN } else indiziert
-}
 
 /**
  * Sucht die große Detail-Kopfzeile (Name/Fixkosten/…) und summiert die Spalten
@@ -214,10 +217,10 @@ private fun fuegeSummenzeileEin(rohZeilen: List<List<String>>): List<List<String
 }
 
 @Composable
-private fun KopfzeilenBalken(zeile: List<String>, freieSpaltenAusblenden: Boolean) {
+private fun KopfzeilenBalken(zeile: List<String>, freieSpaltenAusblenden: Boolean, auszublendendeSpalten: Set<Int>) {
     val letzteBefuellteSpalte = zeile.indexOfLast { it.isNotBlank() }
     val gekuerzt = if (letzteBefuellteSpalte >= 0) zeile.take(letzteBefuellteSpalte + 1) else zeile
-    val sichtbar = sichtbareSpalten(gekuerzt, freieSpaltenAusblenden)
+    val sichtbar = sichtbareSpaltenIndiziert(gekuerzt, freieSpaltenAusblenden, auszublendendeSpalten)
 
     Row(Modifier.background(MaterialTheme.colorScheme.primary)) {
         sichtbar.forEach { (index, wert) ->
@@ -239,6 +242,7 @@ private fun KopfzeilenBalken(zeile: List<String>, freieSpaltenAusblenden: Boolea
 private fun DatenZeile(
     zeile: List<String>,
     freieSpaltenAusblenden: Boolean,
+    auszublendendeSpalten: Set<Int>,
     markiert: Boolean,
     keineAuszahlung: Boolean,
     onKlick: () -> Unit
@@ -253,7 +257,7 @@ private fun DatenZeile(
             .background(hintergrund)
             .clickable { onKlick() }
     ) {
-        sichtbareSpalten(zeile, freieSpaltenAusblenden).forEach { (index, wert) ->
+        sichtbareSpaltenIndiziert(zeile, freieSpaltenAusblenden, auszublendendeSpalten).forEach { (index, wert) ->
             Box(
                 Modifier
                     .width(if (index == 0) NAMENSSPALTENBREITE else SPALTENBREITE)
@@ -268,9 +272,9 @@ private fun DatenZeile(
 
 /** Abschlusszeile: grüner Balken wie die Kopfzeile, alle Zahlen fett und weiß. */
 @Composable
-private fun Summenzeile(zeile: List<String>, freieSpaltenAusblenden: Boolean) {
+private fun Summenzeile(zeile: List<String>, freieSpaltenAusblenden: Boolean, auszublendendeSpalten: Set<Int>) {
     Row(Modifier.background(MaterialTheme.colorScheme.primary)) {
-        sichtbareSpalten(zeile, freieSpaltenAusblenden).forEach { (index, wert) ->
+        sichtbareSpaltenIndiziert(zeile, freieSpaltenAusblenden, auszublendendeSpalten).forEach { (index, wert) ->
             val anzeigeText = when {
                 wert.isBlank() -> ""
                 index in EURO_SUMMEN_SPALTEN -> "$wert €"

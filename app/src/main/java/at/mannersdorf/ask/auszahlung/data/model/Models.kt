@@ -113,9 +113,15 @@ fun SpielerKosten.istApSpieler(): Boolean = name.contains("(AP)", ignoreCase = t
 /** Ebene "Masseur": betrifft alle Zeilen, deren Name "Masseur" enthält. */
 fun SpielerKosten.istMasseur(): Boolean = name.contains("Masseur", ignoreCase = true)
 
-/** Ebene "Betreuung": betrifft alle Zeilen, deren Name "Trainer" oder "Wäsche" enthält. */
+/** Ebene "Tormanntrainer extra": betrifft alle Zeilen, deren Name "Tormanntrainer" enthält. */
+fun SpielerKosten.istTormanntrainer(): Boolean = name.contains("Tormanntrainer", ignoreCase = true)
+
+/**
+ * Ebene "Betreuung": betrifft alle Zeilen, deren Name "Trainer" oder "Wäsche" enthält -
+ * aber nicht "Tormanntrainer" (der hat trotz "Trainer" im Namen seinen eigenen Reiter).
+ */
 fun SpielerKosten.istBetreuung(): Boolean =
-    name.contains("Trainer", ignoreCase = true) || name.contains("Wäsche", ignoreCase = true)
+    !istTormanntrainer() && (name.contains("Trainer", ignoreCase = true) || name.contains("Wäsche", ignoreCase = true))
 
 /** Zeilen mit einem "*" am Namensende sind farblich hervorzuheben ("KEINE AUSZAHLUNG"). */
 fun SpielerKosten.hatKeineAuszahlungMarkierung(): Boolean = name.trim().endsWith("*")

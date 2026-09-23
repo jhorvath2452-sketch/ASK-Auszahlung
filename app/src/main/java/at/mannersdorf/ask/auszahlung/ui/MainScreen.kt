@@ -1,5 +1,6 @@
 package at.mannersdorf.ask.auszahlung.ui
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -29,6 +30,7 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import at.mannersdorf.ask.auszahlung.R
+import at.mannersdorf.ask.auszahlung.data.PdfErsteller
 import at.mannersdorf.ask.auszahlung.data.SettingsStore
 import at.mannersdorf.ask.auszahlung.ui.theme.SchreibmaschinenSchrift
 import at.mannersdorf.ask.auszahlung.ui.theme.VereinsGruen
@@ -56,6 +60,27 @@ import at.mannersdorf.ask.auszahlung.viewmodel.MainViewModel
 fun MainScreen(viewModel: MainViewModel) {
     val zustand by viewModel.zustand.collectAsState()
     var zeigeEinstellungen by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // Wurde die App über eine Push-Benachrichtigung geöffnet (siehe
+    // MainActivity), lädt dieser Effekt die betreffende Bestätigung samt
+    // Unterschrift und öffnet sie automatisch als PDF über den normalen
+    // Android-Teilen-Dialog.
+    LaunchedEffect(zustand.ausPushZuOeffnendeBestaetigungId) {
+        val id = zustand.ausPushZuOeffnendeBestaetigungId ?: return@LaunchedEffect
+        val bestaetigung = viewModel.ladeBestaetigungFuerPush(id)
+        if (bestaetigung != null) {
+            val unterschriftBytes = viewModel.ladeUnterschriftBytes(bestaetigung.unterschriftUrl)
+            val bitmap = unterschriftBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+            val datei = PdfErsteller.erstellePdf(context, bestaetigung, bitmap)
+            PdfErsteller.teilePdf(
+                context,
+                datei,
+                "Auszahlungsbestätigung ${bestaetigung.spielerName} ${bestaetigung.monat}"
+            )
+        }
+        viewModel.bestaetigungAusPushGeoeffnet()
+    }
 
     Scaffold(
         topBar = {
@@ -150,6 +175,11 @@ fun MainScreen(viewModel: MainViewModel) {
                                 text = { Text("Masseur") }
                             )
                             Tab(
+                                selected = zustand.aktiveEbene == Ebene.TORMANNTRAINER,
+                                onClick = { viewModel.wechsleEbene(Ebene.TORMANNTRAINER) },
+                                text = { Text("Tormanntrainer extra") }
+                            )
+                            Tab(
                                 selected = zustand.aktiveEbene == Ebene.BETREUUNG,
                                 onClick = { viewModel.wechsleEbene(Ebene.BETREUUNG) },
                                 text = { Text("Betreuung") }
@@ -190,6 +220,15 @@ fun MainScreen(viewModel: MainViewModel) {
                                 speichernErfolgreich = zustand.speichernErfolgreich,
                                 onAusgewaehlt = viewModel::waehleMasseur,
                                 onDatenUebernehmen = viewModel::speichereMasseurAuszahlung,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            Ebene.TORMANNTRAINER -> TormanntrainerScreen(
+                                monat = zustand.gewaehlterMonat,
+                                alleSpieler = zustand.kostenSpielbetrieb?.spieler ?: emptyList(),
+                                gewaehlterName = zustand.gewaehlterTormanntrainer,
+                                speichernErfolgreich = zustand.speichernErfolgreich,
+                                onAusgewaehlt = viewModel::waehleTormanntrainer,
+                                onDatenUebernehmen = viewModel::speichereTormanntrainerAuszahlung,
                                 modifier = Modifier.fillMaxSize()
                             )
                             Ebene.BETREUUNG -> BetreuungScreen(

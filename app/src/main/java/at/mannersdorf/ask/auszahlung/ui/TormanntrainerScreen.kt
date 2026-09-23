@@ -46,17 +46,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import at.mannersdorf.ask.auszahlung.data.formatiereDeutscheZahl
 import at.mannersdorf.ask.auszahlung.data.model.SpielerKosten
-import at.mannersdorf.ask.auszahlung.data.model.istMasseur
+import at.mannersdorf.ask.auszahlung.data.model.istTormanntrainer
 import at.mannersdorf.ask.auszahlung.data.parseDeutscheZahl
 
 /**
- * Ebene "Masseur": betrifft alle Zeilen aus "Kosten Spielbetrieb", deren Name
- * "Masseur" enthält. Vereinfachtes Formular: nur eine Aufwandsentschädigung
- * (Spalte C × Spalte F) statt der Trainingsgeld/Punkte/Abzüge-Aufteilung.
+ * Ebene "Tormanntrainer extra": betrifft alle Zeilen aus "Kosten Spielbetrieb",
+ * deren Name "Tormanntrainer" enthält. Gleicher Aufbau wie "Masseur":
+ * Aufwandsentschädigung = Spalte C ("Einsätze pro Monat") × Spalte F
+ * ("€ pro Anwesenheit"), statt der Trainingsgeld/Punkte/Abzüge-Aufteilung.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MasseurScreen(
+fun TormanntrainerScreen(
     monat: String?,
     alleSpieler: List<SpielerKosten>,
     gewaehlterName: String?,
@@ -65,8 +66,8 @@ fun MasseurScreen(
     onDatenUebernehmen: (bemerkung: String, korrektur: String, unterschriftBase64: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val masseure = remember(alleSpieler) { alleSpieler.filter { it.istMasseur() } }
-    val spieler = masseure.find { it.name == gewaehlterName }
+    val tormanntrainer = remember(alleSpieler) { alleSpieler.filter { it.istTormanntrainer() } }
+    val spieler = tormanntrainer.find { it.name == gewaehlterName }
     var dropdownOffen by remember { mutableStateOf(false) }
     var bemerkung by remember(gewaehlterName) { mutableStateOf("") }
     var korrektur by remember(gewaehlterName) { mutableStateOf("0") }
@@ -83,15 +84,15 @@ fun MasseurScreen(
     ) {
         ExposedDropdownMenuBox(expanded = dropdownOffen, onExpandedChange = { dropdownOffen = it }) {
             OutlinedTextField(
-                value = gewaehlterName ?: "Masseur wählen",
+                value = gewaehlterName ?: "Tormanntrainer wählen",
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("Masseur") },
+                label = { Text("Tormanntrainer") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownOffen) },
                 modifier = Modifier.fillMaxWidth().menuAnchor()
             )
             ExposedDropdownMenu(expanded = dropdownOffen, onDismissRequest = { dropdownOffen = false }) {
-                masseure.forEach { s ->
+                tormanntrainer.forEach { s ->
                     DropdownMenuItem(
                         text = { Text(s.name) },
                         onClick = {
@@ -107,7 +108,7 @@ fun MasseurScreen(
         Spacer(Modifier.height(16.dp))
 
         if (spieler == null) {
-            Text(if (masseure.isEmpty()) "Keine Masseur-Einträge gefunden." else "Bitte auswählen.")
+            Text(if (tormanntrainer.isEmpty()) "Keine Tormanntrainer-Einträge gefunden." else "Bitte auswählen.")
             return@Column
         }
 
@@ -122,7 +123,7 @@ fun MasseurScreen(
                 Text("Monat: ${monat ?: "-"}", fontWeight = FontWeight.Bold)
                 Text("Einsätze pro Monat: " + ganzzahlOderRoh(spieler.ap), fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
-                InfoZeileMasseur("AUFWANDSENTSCHÄDIGUNG", "€ " + formatiereDeutscheZahl(aufwandsentschaedigung))
+                InfoZeileTormanntrainer("AUFWANDSENTSCHÄDIGUNG", "€ " + formatiereDeutscheZahl(aufwandsentschaedigung))
             }
         }
 
@@ -130,7 +131,7 @@ fun MasseurScreen(
 
         OutlinedTextField(
             value = korrektur,
-            onValueChange = { neu -> korrektur = begrenzeKorrekturMasseur(neu) },
+            onValueChange = { neu -> korrektur = begrenzeKorrekturTormanntrainer(neu) },
             label = { Text("Korrektur (€)") },
             supportingText = { Text("Manuelle Korrektur, -2000 bis +2000") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -215,20 +216,15 @@ fun MasseurScreen(
 }
 
 @Composable
-private fun InfoZeileMasseur(bezeichnung: String, wert: String) {
+private fun InfoZeileTormanntrainer(bezeichnung: String, wert: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(bezeichnung, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(wert, fontWeight = FontWeight.Medium)
     }
 }
 
-/** Ganzzahlige Anzeige ohne Nachkommastellen und ohne €, z.B. für "Einsätze pro Monat". */
-internal fun ganzzahlOderRoh(rohwert: String): String {
-    val zahl = parseDeutscheZahl(rohwert)
-    return if (zahl != null) zahl.toInt().toString() else "(Rohwert: \"$rohwert\")"
-}
 
-private fun begrenzeKorrekturMasseur(eingabe: String): String {
+private fun begrenzeKorrekturTormanntrainer(eingabe: String): String {
     val zahl = parseDeutscheZahl(eingabe) ?: return eingabe
     return when {
         zahl > 2000.0 -> "2000"

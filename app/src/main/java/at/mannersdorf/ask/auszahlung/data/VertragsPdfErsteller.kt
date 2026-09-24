@@ -55,6 +55,14 @@ object VertragsPdfErsteller {
     private fun stempelBitmap(context: Context): Bitmap =
         BitmapFactory.decodeResource(context.resources, R.drawable.ask_stempel)
 
+    /** Formatiert einen Betrag im deutschen Format: "500" → "500,-", "1000" → "1.000,-" */
+    private fun formatiereBetrag(wert: String): String {
+        val zahl = wert.trim().replace(",", ".").toDoubleOrNull() ?: return wert
+        val ganzzahl = zahl.toLong()
+        val formatted = String.format("%,d", ganzzahl).replace(",", ".")
+        return "$formatted,-"
+    }
+
     // ─── Zentrierter Stempel ─────────────────────────────────────────────────
     private fun zeichneStempelZentriert(c: Canvas, context: Context, cx: Float, cy: Float, radius: Float = 42f) {
         val bm = stempelBitmap(context)
@@ -82,7 +90,7 @@ object VertragsPdfErsteller {
         fun flushZeile() {
             var xOff = x
             for ((w, s) in zeile) {
-                val paint = p(10.5f, s.bold)
+                val paint = p(11f, s.bold)
                 if (s.highlight != null) {
                     val bgPaint = Paint().apply { color = Color.parseColor(s.highlight); style = Paint.Style.FILL }
                     val wBreite = paint.measureText("$w ")
@@ -101,7 +109,7 @@ object VertragsPdfErsteller {
         }
 
         for ((wort, span) in worte) {
-            val paint = p(10.5f, span.bold)
+            val paint = p(11f, span.bold)
             val wBreite = paint.measureText("$wort ")
             if (zeileBreite + wBreite > maxW && zeile.isNotEmpty()) flushZeile()
             zeile.add(wort to span)
@@ -125,7 +133,7 @@ object VertragsPdfErsteller {
 
     // ─── Unterschriftsfeld ───────────────────────────────────────────────────
     private fun unterschriftsFeld(c: Canvas, label: String, bm: Bitmap?, x: Float, y: Float, breite: Float, hoehe: Float = 55f) {
-        c.drawText(label, x, y, p(10f, bold = true))
+        c.drawText(label, x, y, p(11f, bold = true))
         c.drawRect(RectF(x, y + 4f, x + breite, y + 4f + hoehe), boxPaint())
         if (bm != null) {
             val maxH = hoehe - 6f
@@ -162,12 +170,12 @@ object VertragsPdfErsteller {
 
         // Felder NAME / ADRESSE / MAIL
         fun eingabeFeld(label: String, wert: String, yPos: Float): Float {
-            c.drawText(label, ML, yPos, p(10.5f, bold = true))
+            c.drawText(label, ML, yPos, p(11f, bold = true))
             val feldX = ML + 75f
             val feldBreite = MR - feldX
             val bgPaint = Paint().apply { color = Color.parseColor("#D6E4F0"); style = Paint.Style.FILL }
             c.drawRect(RectF(feldX, yPos - 10f, feldX + feldBreite, yPos + 2f), bgPaint)
-            c.drawText(wert, feldX + 2f, yPos, p(10.5f))
+            c.drawText(wert, feldX + 2f, yPos, p(11f))
             c.drawLine(feldX, yPos + 2f, feldX + feldBreite, yPos + 2f, liniePaint())
             return yPos + 16f
         }
@@ -182,8 +190,8 @@ object VertragsPdfErsteller {
         ), ML, y) + 4f
 
         // Punkt 1
-        c.drawText("1.", ML, y, p(10.5f, bold = true))
-        c.drawText("Fixum:", ML + 18f, y, p(10.5f, bold = true).also {
+        c.drawText("1.", ML, y, p(11f, bold = true))
+        c.drawText("Fixum:", ML + 18f, y, p(11f, bold = true).also {
             it.isUnderlineText = true
         })
         val p1x = ML + 90f
@@ -191,15 +199,15 @@ object VertragsPdfErsteller {
             text("Sowohl der Zeitraum, als auch die Höhe wird mit jedem einzelnen Spieler frei vereinbart. Gleiches gilt für die Auszahlung.")
         ), p1x, y, MR - p1x) + 4f
 
-        c.drawText("Fixum:", ML + 70f, y, p(10.5f, bold = true))
-        c.drawText("€", ML + 110f, y, p(10.5f))
+        c.drawText("Fixum:", ML + 70f, y, p(11f, bold = true))
+        c.drawText("€", ML + 110f, y, p(11f))
         val fixBgPaint = Paint().apply { color = Color.parseColor("#D6E4F0"); style = Paint.Style.FILL }
         c.drawRect(RectF(ML + 120f, y - 10f, ML + 200f, y + 2f), fixBgPaint)
-        c.drawText(f.fixum, ML + 122f, y, p(10.5f))
+        c.drawText(formatiereBetrag(f.fixum), ML + 122f, y, p(11f, bold = true))
         c.drawLine(ML + 120f, y + 2f, ML + 200f, y + 2f, liniePaint())
         y += 16f
 
-        c.drawText("Voraussetzungen:", ML + 60f, y, p(10.5f, bold = true))
+        c.drawText("Voraussetzungen:", ML + 60f, y, p(11f, bold = true))
         y += 14f
 
         val abcX = ML + 80f
@@ -216,12 +224,12 @@ object VertragsPdfErsteller {
             ))
         )
         for (pk in punkte) {
-            c.drawText(pk.marke, abcX - 20f, y, p(10.5f))
+            c.drawText(pk.marke, abcX - 20f, y, p(11f))
             y = abs(c, pk.spans, abcX, y, abcW) + 2f
         }
         y += 4f
 
-        c.drawText("2.", ML, y, p(10.5f, bold = true))
+        c.drawText("2.", ML, y, p(11f, bold = true))
         y = abs(c, listOf(
             text("Der Verein ist berechtigt, bei besonders gravierenden Verstößen durch den Spieler (nachweisliches Selbstverschulden,...), wobei dem Verein ein sogenannter Folgeschaden entsteht (z.B. anschließende Sperre,...), "),
             fett("eine Geldstrafe"),
@@ -244,7 +252,7 @@ object VertragsPdfErsteller {
         val c = pg.canvas
         var y = 38f
 
-        val klauseln = listOf(
+        val klauseln1 = listOf(
             "3." to listOf(text("Die Entscheidung, ob der Spieler am Spielbericht der Kampfmannschaft aufscheint, obliegt alleine dem Trainer der KM des ASK Mannersdorf.")),
             "4." to listOf(text("Der Trainer legt die Trainingstage fest und führt eine Anwesenheitsliste. Diese dient als Basis für die Auszahlung. Bei einer Trainingsbeteiligung unter "), fett("90%"), text(" behält sich der Verein vor, entsprechende Abzüge bei der Auszahlung zu tätigen.")),
             "5." to listOf(text("Für eine eventuelle Steuerliche Veranlagung muss der Spieler selbst sorgen.")),
@@ -256,7 +264,9 @@ object VertragsPdfErsteller {
             "11." to listOf(
                 text("Sollte unter Punkt 1-10 anderes/zusätzliches vereinbart werden, ist dies hier im Vertrag unter Punkt 11 (ANMERKUNGEN) zu ergänzen und schriftlich festzuhalten. Nicht im Vertrag festgehaltene Vereinbarungen gelten als "),
                 gelbFett("NICHT GETROFFEN!")
-            ),
+            )
+        )
+        val klauseln2 = listOf(
             "12." to listOf(text("Laufzeit der Spielervereinbarung: "), TextSpan("30.06.2027", bold = true, underline = true)),
             "13." to listOf(
                 text("Utensilien, die vom Verein zur Verfügung gestellt werden, können jederzeit zurückgefordert werden. Sobald der Spieler den Verein verlässt, obliegt es dem Verein, ob die Utensilien wieder abzugeben sind. Werden diese nicht zurückgegeben, wird dem Spieler ein Betrag bis zu "),
@@ -265,14 +275,14 @@ object VertragsPdfErsteller {
             )
         )
 
-        for ((nr, spans) in klauseln) {
-            c.drawText(nr, ML, y, p(10.5f, bold = true))
+        for ((nr, spans) in klauseln1) {
+            c.drawText(nr, ML, y, p(11f, bold = true))
             y = abs(c, spans, ML + 22f, y, MR - ML - 22f) + 3f
         }
 
-        // Anmerkungen-Box
+        // Anmerkungen-Box direkt nach Punkt 11 (NICHT GETROFFEN!), vor Punkt 12
         y += 4f
-        c.drawText("Anmerkungen:", ML, y, p(10f, bold = true))
+        c.drawText("Anmerkungen:", ML, y, p(11f, bold = true))
         val boxTop = y + 5f
         val boxH = 60f
         val bgAnm = Paint().apply { color = Color.parseColor("#EDF4FB"); style = Paint.Style.FILL }
@@ -281,12 +291,17 @@ object VertragsPdfErsteller {
         if (f.anmerkungen.isNotBlank()) {
             zeichneSpans(c, listOf(text(f.anmerkungen)), ML + 83f, boxTop + 12f, MR - ML - 86f)
         }
-        y = boxTop + boxH + 18f
+        y = boxTop + boxH + 10f
+
+        for ((nr, spans) in klauseln2) {
+            c.drawText(nr, ML, y, p(11f, bold = true))
+            y = abs(c, spans, ML + 22f, y, MR - ML - 22f) + 3f
+        }
 
         // Datum
-        c.drawText("Datum:", ML, y, p(10.5f, bold = true))
+        c.drawText("Datum:", ML, y, p(11f, bold = true))
         c.drawLine(ML + 45f, y + 2f, ML + 180f, y + 2f, liniePaint())
-        c.drawText(f.datum, ML + 47f, y, p(10.5f))
+        c.drawText(f.datum, ML + 47f, y, p(11f))
         y += 22f
 
         // Unterschriften: 2×2 Raster mit Stempel in der Mitte
@@ -336,7 +351,7 @@ object VertragsPdfErsteller {
         val bgBlau = Paint().apply { color = Color.parseColor("#D6E4F0"); style = Paint.Style.FILL }
         c.drawRect(RectF(nrFeldX, y, nrFeldX + nrFeldB, y + 16f), bgBlau)
         c.drawRect(RectF(nrFeldX, y, nrFeldX + nrFeldB, y + 16f), boxPaint())
-        c.drawText(f.nummer, (W / 2f), y + 12f, p(10.5f, align = Paint.Align.CENTER))
+        c.drawText(f.nummer, (W / 2f), y + 12f, p(11f, bold = true, align = Paint.Align.CENTER))
         y += 28f
 
         y = abs(c, listOf(text("Abgeschlossen zwischen dem ASK Mannersdorf und dem Spieler:")), ML, y) + 4f
@@ -345,7 +360,7 @@ object VertragsPdfErsteller {
         val spBg = Paint().apply { color = Color.parseColor("#D6E4F0"); style = Paint.Style.FILL }
         c.drawRect(RectF(ML, y, MR, y + 16f), spBg)
         c.drawRect(RectF(ML, y, MR, y + 16f), boxPaint())
-        c.drawText(f.name, ML + 3f, y + 12f, p(10.5f, bold = true))
+        c.drawText(f.name, ML + 3f, y + 12f, p(11f, bold = true))
         y += 28f
 
         y = abs(c, listOf(
@@ -356,17 +371,17 @@ object VertragsPdfErsteller {
         ), ML, y) + 8f
 
         // 1. Bonus
-        c.drawText("1.", ML, y, p(10.5f, bold = true))
-        c.drawText("Bonus:", ML + 14f, y, p(10.5f, bold = true).also { it.isUnderlineText = true })
-        c.drawText("€", ML + 70f, y, p(10.5f))
+        c.drawText("1.", ML, y, p(11f, bold = true))
+        c.drawText("Bonus:", ML + 14f, y, p(11f, bold = true).also { it.isUnderlineText = true })
+        c.drawText("€", ML + 70f, y, p(11f))
         val bonusBg = Paint().apply { color = Color.parseColor("#D6E4F0"); style = Paint.Style.FILL }
         c.drawRect(RectF(ML + 80f, y - 10f, ML + 150f, y + 2f), bonusBg)
-        c.drawText(f.bonus, ML + 82f, y, p(10.5f))
+        c.drawText(formatiereBetrag(f.bonus), ML + 82f, y, p(11f, bold = true))
         c.drawLine(ML + 80f, y + 2f, ML + 150f, y + 2f, liniePaint())
         y += 20f
 
         // 2. Punkteprämie
-        c.drawText("2.", ML, y, p(10.5f, bold = true))
+        c.drawText("2.", ML, y, p(11f, bold = true))
         y = abs(c, listOf(TextSpan("Punkteprämie als (Fahrtkosten und Spesenersatz):", bold = true, underline = true)), ML + 14f, y, MR - ML - 14f) + 4f
 
         y = abs(c, listOf(text("Die Prämien werden nach tatsächlicher Spielzeit pro Meisterschaftsbegegnung berechnet.")), ML + 20f, y, MR - ML - 20f)
@@ -376,22 +391,22 @@ object VertragsPdfErsteller {
             "Ist dieser ab der 76. Minute im Einsatz erhält er 50%"
         )
         for (b in bullets) {
-            c.drawText("•", ML + 28f, y, p(10.5f))
+            c.drawText("•", ML + 28f, y, p(11f))
             y = abs(c, listOf(text(b)), ML + 38f, y, MR - ML - 38f) + 1f
         }
         y += 6f
 
         fun zahlenFeld(label: String, wert: String, yPos: Float): Float {
-            c.drawText(label, ML + 40f, yPos, p(10.5f, bold = true))
-            c.drawText("€", ML + 200f, yPos, p(10.5f))
+            c.drawText(label, ML + 40f, yPos, p(11f, bold = true))
+            c.drawText("€", ML + 200f, yPos, p(11f))
             val zFeldBg = Paint().apply { color = Color.parseColor("#D6E4F0"); style = Paint.Style.FILL }
             c.drawRect(RectF(ML + 212f, yPos - 10f, ML + 300f, yPos + 2f), zFeldBg)
-            c.drawText(wert, ML + 214f, yPos, p(10.5f))
+            c.drawText(formatiereBetrag(wert), ML + 214f, yPos, p(11f, bold = true))
             c.drawLine(ML + 212f, yPos + 2f, ML + 300f, yPos + 2f, liniePaint())
             return yPos + 16f
         }
-        y = zahlenFeld("Sieg pro Punkt (3 Punkte)", f.siegProPunkt, y)
-        y = zahlenFeld("Unentschieden (1 Punkt)", f.unentschieden, y) + 8f
+        y = zahlenFeld("Sieg (€)", f.siegProPunkt, y)
+        y = zahlenFeld("Unentschieden (€)", f.unentschieden, y) + 8f
 
         val klauseln3bis5 = listOf(
             "3." to listOf(text("Die Auszahlung des Bonus erfolgt monatlich 10x im Jahr.")),
@@ -399,14 +414,14 @@ object VertragsPdfErsteller {
             "5." to listOf(text("Über die vereinbarten Summen (Fixum, Punkteprämie) ist Stillschweigen zu bewahren!"))
         )
         for ((nr, spans) in klauseln3bis5) {
-            c.drawText(nr, ML, y, p(10.5f, bold = true))
+            c.drawText(nr, ML, y, p(11f, bold = true))
             y = abs(c, spans, ML + 18f, y, MR - ML - 18f) + 2f
         }
         y += 4f
 
         // Anmerkungen
-        c.drawText("6.", ML, y, p(10.5f, bold = true))
-        c.drawText("Anmerkungen:", ML + 14f, y, p(10.5f))
+        c.drawText("6.", ML, y, p(11f, bold = true))
+        c.drawText("Anmerkungen:", ML + 14f, y, p(11f))
         y += 5f
         val anmBoxH = 52f
         val anmBg = Paint().apply { color = Color.parseColor("#EDF4FB"); style = Paint.Style.FILL }
@@ -418,10 +433,10 @@ object VertragsPdfErsteller {
         y += anmBoxH + 14f
 
         // Datum
-        c.drawText("Datum:", ML, y, p(10.5f, bold = true))
+        c.drawText("Datum:", ML, y, p(11f, bold = true))
         val datBg = Paint().apply { color = Color.parseColor("#D6E4F0"); style = Paint.Style.FILL }
         c.drawRect(RectF(ML + 45f, y - 10f, ML + 160f, y + 2f), datBg)
-        c.drawText(f.datum, ML + 47f, y, p(10.5f))
+        c.drawText(f.datum, ML + 47f, y, p(11f))
         c.drawLine(ML + 45f, y + 2f, ML + 160f, y + 2f, liniePaint())
         y += 20f
 

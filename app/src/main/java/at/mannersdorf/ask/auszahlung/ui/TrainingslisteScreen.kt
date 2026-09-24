@@ -1,5 +1,6 @@
 package at.mannersdorf.ask.auszahlung.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,6 +63,22 @@ private val ABKUERZUNGEN = listOf(
 private val WOCHENTAGE = setOf("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
 private val TRAINING_MATCH_KUERZEL = setOf("1", "M")
 private val DATUMS_MUSTER = Regex("""\d{1,2}[./]\d{1,2}""")
+private val REINE_ZAHL_MUSTER = Regex("""^\d{1,2}$""")
+
+/** Datum-Zeile: erste Zelle ist leer oder Wochentag, zweite ist eine reine Zahl 1-31. */
+private fun istDatumZeile(werte: List<String>): Boolean {
+    val erste = werte.getOrNull(0)?.trim() ?: ""
+    val zweite = werte.getOrNull(1)?.trim() ?: ""
+    return (erste.isBlank() || erste in setOf("Mo","Di","Mi","Do","Fr","Sa","So")) &&
+        REINE_ZAHL_MUSTER.matches(zweite) &&
+        zweite.toIntOrNull()?.let { it in 1..31 } == true
+}
+
+/** Formatiert eine Tageszahl mit Punkt: "1" → "1." */
+private fun formatiereDatum(wert: String): String {
+    val zahl = wert.trim().toIntOrNull() ?: return wert
+    return "$zahl."
+}
 
 // "Gegner 1"-"Gegner 4" / "Spalten ausblenden"-Logik: siehe SpaltenErkennung.kt
 // (von Training UND Kosten Spielbetrieb gemeinsam genutzt).
@@ -109,8 +126,14 @@ fun TrainingslisteScreen(daten: TrainingslisteDaten?, modifier: Modifier = Modif
             val auszublendendeSpalten = remember(daten) { ermittleAuszublendendeSpalten(rohZeilen) }
 
             val scrollZustand = rememberScrollState()
+            // Datum-Zeilen-Index für stickyHeader ermitteln
+            val datumZeilenIndizes = remember(daten) {
+                daten.zeilen.indices.filter { i -> istDatumZeile(daten.zeilen[i].werte) }.toSet()
+            }
+
             Column(Modifier.horizontalScroll(scrollZustand)) {
                 HeaderZeile(daten.kopfzeile, spaltenAusblenden, auszublendendeSpalten)
+                @OptIn(ExperimentalFoundationApi::class)
                 LazyColumn {
                     items(daten.zeilen.size) { index ->
                         val zeile = daten.zeilen[index]
@@ -119,7 +142,30 @@ fun TrainingslisteScreen(daten: TrainingslisteDaten?, modifier: Modifier = Modif
                         val ersteZelle = zeile.werte.firstOrNull()?.trim() ?: ""
                         val istTrainingMatchZeile = ersteZelle.contains("Training", ignoreCase = true) &&
                             ersteZelle.contains("Match", ignoreCase = true)
+                        val istDatum = index in datumZeilenIndizes
                         val sterne = sternAnzahl(ersteZelle)
+
+                        if (istDatum) {
+                            // Datum-Zeile: fixiert (stickyHeader geht nicht in items, daher
+                            // dunkelgrüner Hintergrund mit weißer fetter Schrift)
+                            Row(Modifier.background(MaterialTheme.colorScheme.primary)) {
+                                sichtbareSpaltenIndiziert(zeile.werte, spaltenAusblenden, auszublendendeSpalten)
+                                    .forEach { (spaltenIndex, wert) ->
+                                    val angezeigterWert = if (spaltenIndex > 0 && REINE_ZAHL_MUSTER.matches(wert.trim())) {
+                                        formatiereDatum(wert)
+                                    } else wert
+                                    ZellenText(
+                                        wert = angezeigterWert,
+                                        istNamensSpalte = spaltenIndex == 0,
+                                        erzwingeFett = true,
+                                        erzwingeWeiss = true,
+                                        zentriert = spaltenIndex > 0 && REINE_ZAHL_MUSTER.matches(wert.trim()),
+                                        zahltHansFeld = false
+                                    )
+                                }
+                            }
+                            return@items
+                        }
 
                         val hintergrund = when {
                             istLetzteZeile -> MaterialTheme.colorScheme.surfaceVariant
@@ -220,6 +266,7 @@ private fun ZellenText(
     istNamensSpalte: Boolean,
     erzwingeFett: Boolean = false,
     erzwingeWeiss: Boolean = false,
+    zentriert: Boolean = false,
     zahltHansFeld: Boolean = false
 ) {
     val hervorheben = erzwingeFett ||
@@ -232,13 +279,15 @@ private fun ZellenText(
             .width(if (istNamensSpalte) NAMENSSPALTENBREITE else SPALTENBREITE)
             .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
             .background(if (zahltHansFeld) MarkierOrange else Color.Transparent)
-            .padding(6.dp)
+            .padding(6.dp),
+        contentAlignment = if (zentriert) Alignment.Center else Alignment.CenterStart
     ) {
         Text(
             wert,
             style = MaterialTheme.typography.bodySmall,
             fontWeight = if (hervorheben) FontWeight.Bold else FontWeight.Normal,
             color = if (erzwingeWeiss) Color.White else Color.Unspecified,
+            textAlign = if (zentriert) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
             maxLines = 1,
             overflow = if (istNamensSpalte) TextOverflow.Visible else TextOverflow.Clip,
             softWrap = false

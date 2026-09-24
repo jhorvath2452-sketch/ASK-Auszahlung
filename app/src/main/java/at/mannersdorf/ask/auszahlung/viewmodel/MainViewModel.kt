@@ -157,6 +157,9 @@ class MainViewModel(private val context: Context) : ViewModel() {
     suspend fun loescheVertragsformular(id: String) =
         firebaseRepository.loescheVertragsformular(id)
 
+    suspend fun loescheVertrag(id: String) =
+        firebaseRepository.loescheVertrag(id)
+
     suspend fun ladeVertragsformulareFuerSpieler(spielerName: String) =
         firebaseRepository.leseVertragsformulareFuerSpieler(spielerName).getOrDefault(emptyList())
 

@@ -358,7 +358,7 @@ private fun AppKopfzeile(
                 "©chigo2452",
                 color = Color.White,
                 fontFamily = FontFamily.SansSerif,
-                fontSize = 7.sp,
+                fontSize = 14.sp,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 12.dp, bottom = 6.dp)

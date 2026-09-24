@@ -205,24 +205,36 @@ class FirebaseRepository {
 
     /**
      * Ebene "Statistik": lädt alle (nicht gelöschten) Bestätigungen einer
-     * Person innerhalb einer Saison, egal ob Spieler/Masseur/Tormanntrainer/
-     * Betreuung - für die Monats- bzw. Saisonsumme.
+     * Person innerhalb einer Saison. Filtert auch Bestätigungen ohne saison-Feld
+     * (ältere Einträge) anhand des Monatsnamens.
      */
     suspend fun leseBestaetigungenFuerStatistik(spielerName: String, saison: String): Result<List<GespeicherteBestaetigung>> =
         withContext(Dispatchers.IO) {
             try {
                 stelleSicherAngemeldet()
+                // Alle Bestätigungen des Spielers laden (ohne Saison-Filter, da
+                // ältere Einträge kein saison-Feld haben) und clientseitig filtern.
                 val ergebnis = firestore.collection("auszahlungen")
                     .whereEqualTo("spielerName", spielerName)
-                    .whereEqualTo("saison", saison)
                     .get()
                     .await()
+
+                val saisonMonate = when (saison) {
+                    "TEST" -> listOf(
+                        "Jänner2026", "Februar2026", "März2026", "April2026", "Mai2026",
+                        "Juni2026", "Juli2026", "August2026", "September2026", "Oktober2026", "November2026"
+                    )
+                    else -> listOf(
+                        "Jänner2026", "Februar2026", "März2026", "April2026", "Mai2026",
+                        "Juni2026", "Juli2026", "August2026", "September2026", "Oktober2026", "November2026"
+                    )
+                }
 
                 val alle = ergebnis.documents.map { dokument ->
                     GespeicherteBestaetigung(
                         id = dokument.id,
                         monat = dokument.getString("monat") ?: "",
-                        saison = dokument.getString("saison") ?: "2026-27",
+                        saison = dokument.getString("saison") ?: "",
                         spielerName = dokument.getString("spielerName") ?: "",
                         fixum = dokument.getString("fixum") ?: "",
                         punkte = dokument.getString("punkte") ?: "",
@@ -236,7 +248,13 @@ class FirebaseRepository {
                         geloeschtAm = dokument.getLong("geloeschtAm")
                     )
                 }
-                Result.success(alle.filter { it.geloeschtAm == null })
+                // Papierkorb-Einträge rausfiltern; Saison-Zugehörigkeit über
+                // gespeichertes saison-Feld ODER Monatsname im Saison-Monatssatz.
+                val gefiltert = alle.filter { b ->
+                    b.geloeschtAm == null &&
+                    (b.saison == saison || b.saison.isBlank() && b.monat in saisonMonate)
+                }
+                Result.success(gefiltert)
             } catch (e: Exception) {
                 Result.failure(e)
             }
@@ -455,6 +473,17 @@ class FirebaseRepository {
                 val liste = ergebnis.documents.map { it.toVertragsFormular() }
                     .sortedByDescending { it.erstelltAm }
                 Result.success(liste)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    suspend fun loescheVertrag(vertragId: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                firestore.collection("vertraege").document(vertragId).delete().await()
+                Result.success(Unit)
             } catch (e: Exception) {
                 Result.failure(e)
             }

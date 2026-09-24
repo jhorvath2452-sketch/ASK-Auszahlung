@@ -66,11 +66,16 @@ fun StatistikScreen(
     // gibt, z.B. eine Korrektur als zusätzlicher Eintrag).
     val summenProMonat = remember(ergebnisse) {
         ergebnisse
-            .groupBy { it.monat }
+            .groupBy { it.monat.trim() }
             .mapValues { (_, eintraege) -> eintraege.sumOf { parseDeutscheZahl(it.betragErhalten) ?: 0.0 } }
     }
     val sichtbareMonate = SAISON_MONATE.filter { it in gewaehlteMonate }
-    val gesamtsumme = sichtbareMonate.sumOf { summenProMonat[it] ?: 0.0 }
+    val gesamtsumme = sichtbareMonate.sumOf { monat ->
+        // robuster Match: auch Beträge zu Monaten mit leichten Abweichungen finden
+        summenProMonat[monat] ?: summenProMonat.entries.firstOrNull {
+            it.key.equals(monat, ignoreCase = true)
+        }?.value ?: 0.0
+    }
 
     Column(modifier.fillMaxSize().padding(12.dp)) {
         Text("Statistik", style = MaterialTheme.typography.titleMedium)

@@ -169,6 +169,7 @@ private fun DateiListenAnsicht(
     var zeigeVorlagenAuswahl by remember { mutableStateOf(false) }
     var hochladenLaeuft by remember { mutableStateOf(false) }
     var zumLoeschenFormularId by remember { mutableStateOf<String?>(null) }
+    var zumLoeschenDateiId by remember { mutableStateOf<String?>(null) }
 
     suspend fun neuLaden() {
         laedt = true
@@ -244,10 +245,14 @@ private fun DateiListenAnsicht(
         }
 
         LazyColumn(Modifier.fillMaxWidth()) {
+            @OptIn(ExperimentalFoundationApi::class)
             items(dateien, key = { it.id }) { datei ->
                 Card(
                     Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
-                        .clickable { oeffnePdfUrl(context, datei.downloadUrl) }
+                        .combinedClickable(
+                            onClick = { oeffnePdfUrl(context, datei.downloadUrl) },
+                            onLongClick = { zumLoeschenDateiId = datei.id }
+                        )
                 ) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Description, contentDescription = null)
@@ -289,6 +294,46 @@ private fun DateiListenAnsicht(
                 }
             }
         }
+    }
+
+    // Lösch-Dialog für hochgeladene Dateien
+    zumLoeschenDateiId?.let { dateiId ->
+        var pin by remember { mutableStateOf("") }
+        var bestaetigt by remember { mutableStateOf(false) }
+        AlertDialog(
+            onDismissRequest = { zumLoeschenDateiId = null },
+            title = { Text("Datei löschen?") },
+            text = {
+                Column {
+                    Text("Diese hochgeladene Datei wirklich löschen?")
+                    OutlinedTextField(
+                        value = pin, onValueChange = { pin = it; bestaetigt = false },
+                        label = { Text("PIN") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                        Checkbox(checked = bestaetigt, onCheckedChange = { bestaetigt = it })
+                        Text("Ja, wirklich löschen")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = bestaetigt && pin == "24521919",
+                    onClick = {
+                        coroutineScope.launch {
+                            viewModel.loescheVertrag(dateiId)
+                            neuLaden()
+                        }
+                        zumLoeschenDateiId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB3261E))
+                ) { Text("Löschen") }
+            },
+            dismissButton = { TextButton(onClick = { zumLoeschenDateiId = null }) { Text("Abbrechen") } }
+        )
     }
 
     // Lösch-Dialog für Vertragsformulare

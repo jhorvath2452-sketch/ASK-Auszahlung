@@ -49,6 +49,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import at.mannersdorf.ask.auszahlung.data.PdfErsteller
+import at.mannersdorf.ask.auszahlung.data.SICHERHEITS_PIN
 import at.mannersdorf.ask.auszahlung.data.model.GespeicherteBestaetigung
 
 private const val ALLE_FILTER = "Alle"
@@ -199,8 +200,6 @@ fun BestaetigungenScreen(
     }
 }
 
-private const val LOESCH_PIN = "24521919"
-
 /**
  * PIN-Bestätigung fürs Löschen: erst bei korrekt eingegebenem PIN wird der
  * Löschen-Button aktiv. Landet nicht sofort im Nichts, sondern 40 Tage im
@@ -213,7 +212,7 @@ private fun LoeschBestaetigungsDialog(
     onLoeschenBestaetigt: () -> Unit
 ) {
     var eingegebenerPin by remember { mutableStateOf("") }
-    val pinKorrekt = eingegebenerPin == LOESCH_PIN
+    val pinKorrekt = eingegebenerPin == SICHERHEITS_PIN
 
     AlertDialog(
         onDismissRequest = onAbbrechen,

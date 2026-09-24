@@ -12,6 +12,8 @@ import at.mannersdorf.ask.auszahlung.data.model.GespeicherteBestaetigung
 import at.mannersdorf.ask.auszahlung.data.model.KostenSpielbetriebDaten
 import at.mannersdorf.ask.auszahlung.data.model.SpaltenZuordnung
 import at.mannersdorf.ask.auszahlung.data.model.TrainingslisteDaten
+import at.mannersdorf.ask.auszahlung.data.model.VertragsFormular
+import at.mannersdorf.ask.auszahlung.data.model.VertragsDatei
 import at.mannersdorf.ask.auszahlung.data.model.istBetreuung
 import at.mannersdorf.ask.auszahlung.data.model.istMasseur
 import at.mannersdorf.ask.auszahlung.data.model.istTormanntrainer
@@ -25,7 +27,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class Ebene { TRAININGSLISTE, KOSTEN_SPIELBETRIEB, SPIELER, MASSEUR, TORMANNTRAINER, BETREUUNG, STATISTIK, BESTAETIGUNGEN }
+enum class Ebene { TRAININGSLISTE, KOSTEN_SPIELBETRIEB, SPIELER, MASSEUR, TORMANNTRAINER, BETREUUNG, VERTRAEGE, STATISTIK, BESTAETIGUNGEN }
 
 /** Alle Monate einer Saison, in chronologischer Reihenfolge (Dezember/Winterpause bewusst ausgelassen). */
 val SAISON_MONATE = listOf(
@@ -143,6 +145,64 @@ class MainViewModel(private val context: Context) : ViewModel() {
     /** Für Ebene 4: lädt die Unterschrift-PNG-Bytes einer gespeicherten Bestätigung bei Bedarf. */
     suspend fun ladeUnterschriftBytes(unterschriftUrl: String): ByteArray? =
         firebaseRepository.leseUnterschriftBytes(unterschriftUrl).getOrNull()
+
+    // ---------- Verträge ----------
+
+    suspend fun ladeVertraegeFuerSpieler(spielerName: String) =
+        firebaseRepository.leseVertraegeFuerSpieler(spielerName).getOrDefault(emptyList())
+
+    suspend fun ladeVertragHoch(spielerName: String, dateiName: String, bytes: ByteArray) =
+        firebaseRepository.ladeVertragHoch(spielerName, dateiName, bytes)
+
+    suspend fun ladeVertragsformulareFuerSpieler(spielerName: String) =
+        firebaseRepository.leseVertragsformulareFuerSpieler(spielerName).getOrDefault(emptyList())
+
+    suspend fun ladeVertragsformular(id: String) =
+        firebaseRepository.leseVertragsformular(id).getOrNull()
+
+    suspend fun speichereVertragsFormular(formular: VertragsFormular) =
+        firebaseRepository.speichereVertragsFormular(formular)
+
+    suspend fun ermittleNaechsteVereinbarungsNummer(jahr: Int) =
+        firebaseRepository.ermittleNaechsteVereinbarungsNummer(jahr).getOrNull()
+
+    suspend fun speichereVereinbarungsNummer(nummer: String, jahr: Int, spielerName: String) =
+        firebaseRepository.speichereVereinbarungsNummer(nummer, jahr, spielerName)
+
+    suspend fun ladeBildHoch(pfad: String, base64Png: String) =
+        firebaseRepository.ladeBildHoch(pfad, base64Png)
+
+    suspend fun ladeDateiHoch(pfad: String, bytes: ByteArray) =
+        firebaseRepository.ladeDateiHoch(pfad, bytes)
+
+    // ---------- Verträge ----------
+
+    suspend fun ladeVertraegeFuerSpieler(spielerName: String): Result<List<VertragsDatei>> =
+        firebaseRepository.leseVertraegeFuerSpieler(spielerName)
+
+    suspend fun ladeVertragHoch(spielerName: String, dateiName: String, bytes: ByteArray): Result<Unit> =
+        firebaseRepository.ladeVertragHoch(spielerName, dateiName, bytes)
+
+    /** Unverbindliche Vorschau der nächsten Vereinbarungs-Nummer für das aktuelle Jahr. */
+    suspend fun holeVorschauVereinbarungsNummer(): String {
+        val jahr = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        return firebaseRepository.ermittleNaechsteVereinbarungsNummer(jahr).getOrDefault("$jahr#001")
+    }
+
+    /** Reserviert die Nummer endgültig, lädt das PDF hoch und verknüpft es mit dem Spieler. */
+    suspend fun schliesseVereinbarungAb(nummer: String, spielerName: String, pdfBytes: ByteArray): Result<Unit> {
+        val jahr = nummer.substringBefore("#").toIntOrNull()
+            ?: java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        val nummerErgebnis = firebaseRepository.speichereVereinbarungsNummer(nummer, jahr, spielerName)
+        if (nummerErgebnis.isFailure) return nummerErgebnis
+        val dateiName = "Vereinbarung_$nummer.pdf"
+        return firebaseRepository.ladeVertragHoch(spielerName, dateiName, pdfBytes)
+    }
+
+    suspend fun schliesseZusatzAb(spielerName: String, pdfBytes: ByteArray): Result<Unit> {
+        val dateiName = "Zusatz_${spielerName}_${System.currentTimeMillis()}.pdf"
+        return firebaseRepository.ladeVertragHoch(spielerName, dateiName, pdfBytes)
+    }
 
     // ---------- Statistik ----------
 

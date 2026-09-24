@@ -127,3 +127,86 @@ fun SpielerKosten.istBetreuung(): Boolean =
 
 /** Zeilen mit einem "*" am Namensende sind farblich hervorzuheben ("KEINE AUSZAHLUNG"). */
 fun SpielerKosten.hatKeineAuszahlungMarkierung(): Boolean = name.trim().endsWith("*")
+
+/**
+ * Ebene "Verträge": eine mit einem Spieler verknüpfte PDF-Datei (bis zu 5 pro
+ * Spieler). Liegt als Datei in Firebase Storage, Metadaten in Firestore.
+ */
+data class VertragsDatei(
+    val id: String,
+    val spielerName: String,
+    val dateiName: String,
+    val downloadUrl: String,
+    val hochgeladenAm: String
+)
+
+/** Welche Vorlage ein Vertragsformular verwendet. */
+enum class VertragsTyp { VEREINBARUNG, ZUSATZ }
+
+/**
+ * Ein ausfüllbares Vertragsformular (Entwurf oder bereits gestempelt/gesperrt).
+ * Deckt beide Vorlagen ab - je nach [typ] werden nur die passenden Felder
+ * angezeigt/verwendet, alle anderen bleiben leer.
+ *  - VEREINBARUNG: nummer (automatisch, fortlaufend "JAHR#NNN"), name, adresse,
+ *    mail, fixum, unterschriftObmann/Spieler/Kassier/SportlicherLeiter.
+ *  - ZUSATZ: nummer (frei, z.B. Referenz auf die zugehörige Vereinbarung),
+ *    name, bonus, siegProPunkt, unentschieden, unterschriftObmann/Spieler/SportlicherLeiter.
+ * Gemeinsam: anmerkungen, datum. Erst wenn [gestempelt] true ist (nur per PIN
+ * setzbar), gilt das Formular als abgeschlossen und darf nicht mehr geändert werden.
+ */
+data class VertragsFormular(
+    val id: String = "",
+    val typ: VertragsTyp = VertragsTyp.VEREINBARUNG,
+    val nummer: String = "",
+    val spielerName: String = "",
+    val name: String = "",
+    val adresse: String = "",
+    val mail: String = "",
+    val fixum: String = "",
+    val bonus: String = "",
+    val siegProPunkt: String = "",
+    val unentschieden: String = "",
+    val anmerkungen: String = "",
+    val datum: String = "",
+    val unterschriftObmannUrl: String = "",
+    val unterschriftSpielerUrl: String = "",
+    val unterschriftKassierUrl: String = "",
+    val unterschriftSportlicherLeiterUrl: String = "",
+    val gestempelt: Boolean = false,
+    val gestempeltAm: String = "",
+    val erstelltAm: String = "",
+    val fertigesPdfUrl: String = ""
+)
+
+/**
+ * Ausfüllbares Formular "VEREINBARUNG" (Hauptvertrag). Die Nummer
+ * (z.B. "2026#001") wird erst beim Stempeln fest vergeben - solange nur
+ * Entwurf, zeigt die App eine unverbindliche Vorschau der nächsten Nummer.
+ */
+data class VereinbarungFormular(
+    val spielerName: String,
+    val name: String = "",
+    val adresse: String = "",
+    val mail: String = "",
+    val fixum: String = "",
+    val anmerkungen: String = "",
+    val datum: String = "",
+    val unterschriftObmann: String? = null,
+    val unterschriftSpieler: String? = null,
+    val unterschriftSportlicherLeiter: String? = null,
+    val unterschriftKassier: String? = null
+)
+
+/** Ausfüllbares Formular "ZUSATZ zur VEREINBARUNG" (Bonus/Punkteprämie). */
+data class ZusatzFormular(
+    val spielerName: String,
+    val bezugVereinbarung: String = "",
+    val bonus: String = "",
+    val siegProPunkt: String = "",
+    val unentschieden: String = "",
+    val anmerkungen: String = "",
+    val datum: String = "",
+    val unterschriftSportlicherLeiter: String? = null,
+    val unterschriftObmann: String? = null,
+    val unterschriftSpieler: String? = null
+)

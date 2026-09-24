@@ -3,8 +3,12 @@ package at.mannersdorf.ask.auszahlung.data
 import android.util.Base64
 import at.mannersdorf.ask.auszahlung.data.model.Auszahlungsbestaetigung
 import at.mannersdorf.ask.auszahlung.data.model.GespeicherteBestaetigung
+import at.mannersdorf.ask.auszahlung.data.model.VertragsDatei
+import at.mannersdorf.ask.auszahlung.data.model.VertragsFormular
+import at.mannersdorf.ask.auszahlung.data.model.VertragsTyp
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
 import com.google.firebase.storage.storage
@@ -30,6 +34,7 @@ class FirebaseRepository {
 
     companion object {
         private const val AUFBEWAHRUNG_PAPIERKORB_MS = 40L * 24 * 60 * 60 * 1000
+        const val MAX_VERTRAEGE_PRO_SPIELER = 5
     }
 
     private val auth by lazy { Firebase.auth }
@@ -258,6 +263,20 @@ class FirebaseRepository {
             }
         }
 
+    /** Lädt ein Base64-PNG (z.B. eine Vertrags-Unterschrift) unter dem angegebenen Storage-Pfad hoch, liefert die Download-URL. */
+    suspend fun ladeBildHoch(pfad: String, base64Png: String): Result<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                val bytes = Base64.decode(base64Png, Base64.NO_WRAP)
+                val referenz = storage.reference.child(pfad)
+                referenz.putBytes(bytes).await()
+                Result.success(referenz.downloadUrl.await().toString())
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     /** Lädt die Unterschrift-PNG-Bytes über die Firebase-Storage-Download-URL. */    suspend fun leseUnterschriftBytes(unterschriftUrl: String): Result<ByteArray> =
         withContext(Dispatchers.IO) {
             try {
@@ -268,4 +287,217 @@ class FirebaseRepository {
                 Result.failure(e)
             }
         }
+
+    /** Lädt beliebige Datei-Bytes (z.B. ein fertig generiertes Vertrags-PDF) unter dem angegebenen Storage-Pfad hoch, liefert die Download-URL. */
+    suspend fun ladeDateiHoch(pfad: String, bytes: ByteArray): Result<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                val referenz = storage.reference.child(pfad)
+                referenz.putBytes(bytes).await()
+                Result.success(referenz.downloadUrl.await().toString())
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    // ---------- Verträge ----------
+
+    /** Lädt alle mit einem Spieler verknüpften Vertragsdateien (max. 5). */
+    suspend fun leseVertraegeFuerSpieler(spielerName: String): Result<List<VertragsDatei>> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                val ergebnis = firestore.collection("vertraege")
+                    .whereEqualTo("spielerName", spielerName)
+                    .get()
+                    .await()
+                val liste = ergebnis.documents.map { dokument ->
+                    VertragsDatei(
+                        id = dokument.id,
+                        spielerName = dokument.getString("spielerName") ?: "",
+                        dateiName = dokument.getString("dateiName") ?: "",
+                        downloadUrl = dokument.getString("downloadUrl") ?: "",
+                        hochgeladenAm = dokument.getString("hochgeladenAm") ?: ""
+                    )
+                }.sortedByDescending { it.hochgeladenAm }
+                Result.success(liste)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    /**
+     * Lädt eine PDF-Datei hoch und verknüpft sie mit einem Spieler. Lehnt ab,
+     * wenn der Spieler schon MAX_VERTRAEGE_PRO_SPIELER Dateien hat.
+     */
+    suspend fun ladeVertragHoch(spielerName: String, dateiName: String, bytes: ByteArray): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                val bisherige = leseVertraegeFuerSpieler(spielerName).getOrDefault(emptyList())
+                if (bisherige.size >= MAX_VERTRAEGE_PRO_SPIELER) {
+                    return@withContext Result.failure(
+                        IllegalStateException("Für $spielerName sind bereits $MAX_VERTRAEGE_PRO_SPIELER Verträge hinterlegt - erst einen entfernen.")
+                    )
+                }
+
+                val zeitstempel = System.currentTimeMillis()
+                val dateiSicherName = dateiName.replace(Regex("[^A-Za-z0-9äöüÄÖÜß_.-]"), "_")
+                val speicherName = "${zeitstempel}_$dateiSicherName"
+                val storageRef = storage.reference.child("vertraege/$spielerName/$speicherName")
+                storageRef.putBytes(bytes).await()
+                val downloadUrl = storageRef.downloadUrl.await().toString()
+
+                val dokument = hashMapOf(
+                    "spielerName" to spielerName,
+                    "dateiName" to dateiName,
+                    "downloadUrl" to downloadUrl,
+                    "hochgeladenAm" to zeitstempel.toString()
+                )
+                firestore.collection("vertraege").add(dokument).await()
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    /**
+     * Ermittelt die nächste freie Vereinbarungs-Nummer für das aktuelle Jahr
+     * (z.B. "2026#003"), gezählt an bereits gestempelten Vereinbarungen -
+     * beginnt jedes Jahr wieder bei #001.
+     */
+    suspend fun ermittleNaechsteVereinbarungsNummer(jahr: Int): Result<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                val ergebnis = firestore.collection("vereinbarungen")
+                    .whereEqualTo("jahr", jahr)
+                    .get()
+                    .await()
+                val naechste = ergebnis.size() + 1
+                Result.success("$jahr#" + naechste.toString().padStart(3, '0'))
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    /** Speichert die Metadaten einer gestempelten (abgeschlossenen) Vereinbarung, damit die Nummer nie doppelt vergeben wird. */
+    suspend fun speichereVereinbarungsNummer(nummer: String, jahr: Int, spielerName: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                val dokument = hashMapOf(
+                    "nummer" to nummer,
+                    "jahr" to jahr,
+                    "spielerName" to spielerName,
+                    "erstelltAm" to System.currentTimeMillis()
+                )
+                firestore.collection("vereinbarungen").document(nummer).set(dokument).await()
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    /**
+     * Legt ein Vertragsformular (Entwurf oder gestempelt) an oder aktualisiert es -
+     * anhand von [formular.id]: leer -> neues Dokument, sonst Update des
+     * bestehenden. Liefert die (neue oder bestehende) Dokument-ID zurück.
+     */
+    suspend fun speichereVertragsFormular(formular: VertragsFormular): Result<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                val daten = hashMapOf(
+                    "typ" to formular.typ.name,
+                    "nummer" to formular.nummer,
+                    "spielerName" to formular.spielerName,
+                    "name" to formular.name,
+                    "adresse" to formular.adresse,
+                    "mail" to formular.mail,
+                    "fixum" to formular.fixum,
+                    "bonus" to formular.bonus,
+                    "siegProPunkt" to formular.siegProPunkt,
+                    "unentschieden" to formular.unentschieden,
+                    "anmerkungen" to formular.anmerkungen,
+                    "datum" to formular.datum,
+                    "unterschriftObmannUrl" to formular.unterschriftObmannUrl,
+                    "unterschriftSpielerUrl" to formular.unterschriftSpielerUrl,
+                    "unterschriftKassierUrl" to formular.unterschriftKassierUrl,
+                    "unterschriftSportlicherLeiterUrl" to formular.unterschriftSportlicherLeiterUrl,
+                    "gestempelt" to formular.gestempelt,
+                    "gestempeltAm" to formular.gestempeltAm,
+                    "erstelltAm" to formular.erstelltAm,
+                    "fertigesPdfUrl" to formular.fertigesPdfUrl
+                )
+                val referenz = if (formular.id.isBlank()) {
+                    firestore.collection("vertragsformulare").document()
+                } else {
+                    firestore.collection("vertragsformulare").document(formular.id)
+                }
+                referenz.set(daten).await()
+                Result.success(referenz.id)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    /** Lädt alle Vertragsformulare (Entwürfe + gestempelte) eines Spielers, neueste zuerst. */
+    suspend fun leseVertragsformulareFuerSpieler(spielerName: String): Result<List<VertragsFormular>> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                val ergebnis = firestore.collection("vertragsformulare")
+                    .whereEqualTo("spielerName", spielerName)
+                    .get()
+                    .await()
+                val liste = ergebnis.documents.map { it.toVertragsFormular() }
+                    .sortedByDescending { it.erstelltAm }
+                Result.success(liste)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    /** Lädt ein einzelnes Vertragsformular per ID (zum Fortsetzen eines Entwurfs). */
+    suspend fun leseVertragsformular(id: String): Result<VertragsFormular> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                val dokument = firestore.collection("vertragsformulare").document(id).get().await()
+                if (!dokument.exists()) {
+                    return@withContext Result.failure(NoSuchElementException("Formular nicht gefunden."))
+                }
+                Result.success(dokument.toVertragsFormular())
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    private fun DocumentSnapshot.toVertragsFormular(): VertragsFormular =
+        VertragsFormular(
+            id = id,
+            typ = runCatching { VertragsTyp.valueOf(getString("typ") ?: "VEREINBARUNG") }
+                .getOrDefault(VertragsTyp.VEREINBARUNG),
+            nummer = getString("nummer") ?: "",
+            spielerName = getString("spielerName") ?: "",
+            name = getString("name") ?: "",
+            adresse = getString("adresse") ?: "",
+            mail = getString("mail") ?: "",
+            fixum = getString("fixum") ?: "",
+            bonus = getString("bonus") ?: "",
+            siegProPunkt = getString("siegProPunkt") ?: "",
+            unentschieden = getString("unentschieden") ?: "",
+            anmerkungen = getString("anmerkungen") ?: "",
+            datum = getString("datum") ?: "",
+            unterschriftObmannUrl = getString("unterschriftObmannUrl") ?: "",
+            unterschriftSpielerUrl = getString("unterschriftSpielerUrl") ?: "",
+            unterschriftKassierUrl = getString("unterschriftKassierUrl") ?: "",
+            unterschriftSportlicherLeiterUrl = getString("unterschriftSportlicherLeiterUrl") ?: "",
+            gestempelt = getBoolean("gestempelt") ?: false,
+            gestempeltAm = getString("gestempeltAm") ?: "",
+            erstelltAm = getString("erstelltAm") ?: "",
+            fertigesPdfUrl = getString("fertigesPdfUrl") ?: ""
+        )
 }

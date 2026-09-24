@@ -185,6 +185,11 @@ fun MainScreen(viewModel: MainViewModel) {
                                 text = { Text("Betreuung") }
                             )
                             Tab(
+                                selected = zustand.aktiveEbene == Ebene.VERTRAEGE,
+                                onClick = { viewModel.wechsleEbene(Ebene.VERTRAEGE) },
+                                text = { Text("Verträge") }
+                            )
+                            Tab(
                                 selected = zustand.aktiveEbene == Ebene.STATISTIK,
                                 onClick = { viewModel.wechsleEbene(Ebene.STATISTIK) },
                                 text = { Text("Statistik") }
@@ -243,6 +248,11 @@ fun MainScreen(viewModel: MainViewModel) {
                                 speichernErfolgreich = zustand.speichernErfolgreich,
                                 onAusgewaehlt = viewModel::waehleBetreuer,
                                 onDatenUebernehmen = viewModel::speichereBetreuungAuszahlung,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            Ebene.VERTRAEGE -> VertraegeScreen(
+                                alleSpieler = zustand.kostenSpielbetrieb?.spieler ?: emptyList(),
+                                viewModel = viewModel,
                                 modifier = Modifier.fillMaxSize()
                             )
                             Ebene.STATISTIK -> StatistikScreen(

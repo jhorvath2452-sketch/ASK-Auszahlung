@@ -75,8 +75,23 @@ private sealed class VertraegeAnsicht {
  * erstellen). "Neuer Vertrag" oben lässt zwischen den zwei Vorlagen wählen.
  */
 @Composable
-fun VertraegeScreen(alleSpieler: List<SpielerKosten>, viewModel: MainViewModel, modifier: Modifier = Modifier) {
-    var ansicht by remember { mutableStateOf<VertraegeAnsicht>(VertraegeAnsicht.SpielerListe) }
+fun VertraegeScreen(
+    alleSpieler: List<SpielerKosten>,
+    viewModel: MainViewModel,
+    angemeldeterBenutzer: at.mannersdorf.ask.auszahlung.data.model.AppBenutzer? = null,
+    modifier: Modifier = Modifier
+) {
+    val istSpieler = angemeldeterBenutzer?.rolle == at.mannersdorf.ask.auszahlung.data.model.Benutzerrolle.SPIELER
+
+    // Spieler sehen direkt ihre eigene Dateiliste (kein Umweg über Spielerliste)
+    var ansicht by remember(angemeldeterBenutzer) {
+        mutableStateOf<VertraegeAnsicht>(
+            if (istSpieler && angemeldeterBenutzer != null)
+                VertraegeAnsicht.DateiListe(angemeldeterBenutzer.benutzername)
+            else
+                VertraegeAnsicht.SpielerListe
+        )
+    }
 
     when (val a = ansicht) {
         is VertraegeAnsicht.SpielerListe -> SpielerListenAnsicht(

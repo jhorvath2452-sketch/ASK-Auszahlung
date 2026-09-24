@@ -167,55 +167,50 @@ fun MainScreen(
                             )
                         }
 
+                        val istSpieler = angemeldeterBenutzer.rolle == at.mannersdorf.ask.auszahlung.data.model.Benutzerrolle.SPIELER
+
+                        // Spieler sehen nur den Verträge-Tab
+                        if (!istSpieler && zustand.aktiveEbene == Ebene.TRAININGSLISTE) {
+                            // normaler Flow
+                        } else if (istSpieler && zustand.aktiveEbene != Ebene.VERTRAEGE) {
+                            viewModel.wechsleEbene(Ebene.VERTRAEGE)
+                        }
+
                         ScrollableTabRow(
                             selectedTabIndex = Ebene.entries.indexOf(zustand.aktiveEbene),
                             edgePadding = 12.dp
                         ) {
-                            Tab(
-                                selected = zustand.aktiveEbene == Ebene.TRAININGSLISTE,
-                                onClick = { viewModel.wechsleEbene(Ebene.TRAININGSLISTE) },
-                                text = { Text("Training") }
-                            )
-                            Tab(
-                                selected = zustand.aktiveEbene == Ebene.KOSTEN_SPIELBETRIEB,
-                                onClick = { viewModel.wechsleEbene(Ebene.KOSTEN_SPIELBETRIEB) },
-                                text = { Text("Kosten") }
-                            )
-                            Tab(
-                                selected = zustand.aktiveEbene == Ebene.SPIELER,
-                                onClick = { viewModel.wechsleEbene(Ebene.SPIELER) },
-                                text = { Text("Spieler") }
-                            )
-                            Tab(
-                                selected = zustand.aktiveEbene == Ebene.MASSEUR,
-                                onClick = { viewModel.wechsleEbene(Ebene.MASSEUR) },
-                                text = { Text("Masseur") }
-                            )
-                            Tab(
-                                selected = zustand.aktiveEbene == Ebene.TORMANNTRAINER,
-                                onClick = { viewModel.wechsleEbene(Ebene.TORMANNTRAINER) },
-                                text = { Text("Tormanntrainer extra") }
-                            )
-                            Tab(
-                                selected = zustand.aktiveEbene == Ebene.BETREUUNG,
-                                onClick = { viewModel.wechsleEbene(Ebene.BETREUUNG) },
-                                text = { Text("Betreuung") }
-                            )
-                            Tab(
-                                selected = zustand.aktiveEbene == Ebene.VERTRAEGE,
+                            if (!istSpieler) {
+                                Tab(selected = zustand.aktiveEbene == Ebene.TRAININGSLISTE,
+                                    onClick = { viewModel.wechsleEbene(Ebene.TRAININGSLISTE) },
+                                    text = { Text("Training") })
+                                Tab(selected = zustand.aktiveEbene == Ebene.KOSTEN_SPIELBETRIEB,
+                                    onClick = { viewModel.wechsleEbene(Ebene.KOSTEN_SPIELBETRIEB) },
+                                    text = { Text("Kosten") })
+                                Tab(selected = zustand.aktiveEbene == Ebene.SPIELER,
+                                    onClick = { viewModel.wechsleEbene(Ebene.SPIELER) },
+                                    text = { Text("Spieler") })
+                                Tab(selected = zustand.aktiveEbene == Ebene.MASSEUR,
+                                    onClick = { viewModel.wechsleEbene(Ebene.MASSEUR) },
+                                    text = { Text("Masseur") })
+                                Tab(selected = zustand.aktiveEbene == Ebene.TORMANNTRAINER,
+                                    onClick = { viewModel.wechsleEbene(Ebene.TORMANNTRAINER) },
+                                    text = { Text("Tormanntrainer extra") })
+                                Tab(selected = zustand.aktiveEbene == Ebene.BETREUUNG,
+                                    onClick = { viewModel.wechsleEbene(Ebene.BETREUUNG) },
+                                    text = { Text("Betreuung") })
+                            }
+                            Tab(selected = zustand.aktiveEbene == Ebene.VERTRAEGE,
                                 onClick = { viewModel.wechsleEbene(Ebene.VERTRAEGE) },
-                                text = { Text("Verträge") }
-                            )
-                            Tab(
-                                selected = zustand.aktiveEbene == Ebene.STATISTIK,
-                                onClick = { viewModel.wechsleEbene(Ebene.STATISTIK) },
-                                text = { Text("Statistik") }
-                            )
-                            Tab(
-                                selected = zustand.aktiveEbene == Ebene.BESTAETIGUNGEN,
-                                onClick = { viewModel.wechsleEbene(Ebene.BESTAETIGUNGEN) },
-                                text = { Text("Bestätigung") }
-                            )
+                                text = { Text("Verträge") })
+                            if (!istSpieler) {
+                                Tab(selected = zustand.aktiveEbene == Ebene.STATISTIK,
+                                    onClick = { viewModel.wechsleEbene(Ebene.STATISTIK) },
+                                    text = { Text("Statistik") })
+                                Tab(selected = zustand.aktiveEbene == Ebene.BESTAETIGUNGEN,
+                                    onClick = { viewModel.wechsleEbene(Ebene.BESTAETIGUNGEN) },
+                                    text = { Text("Bestätigung") })
+                            }
                         }
 
                         zustand.fehler?.let { fehlertext ->
@@ -270,6 +265,7 @@ fun MainScreen(
                             Ebene.VERTRAEGE -> VertraegeScreen(
                                 alleSpieler = zustand.kostenSpielbetrieb?.spieler ?: emptyList(),
                                 viewModel = viewModel,
+                                angemeldeterBenutzer = angemeldeterBenutzer,
                                 modifier = Modifier.fillMaxSize()
                             )
                             Ebene.STATISTIK -> StatistikScreen(

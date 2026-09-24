@@ -28,6 +28,16 @@ class UserStore(private val context: Context) {
         val KEY_EINGELOGGT_ALS = stringPreferencesKey("eingeloggt_als")
         const val ADMIN_NAME = "admin"
         const val ADMIN_PIN = "24521919"
+        const val SPIELER_STANDARD_PIN = "0815"
+
+        /** Alle Spieler von Sutter bis Altun – werden automatisch als User angelegt. */
+        val SPIELER_NAMEN = listOf(
+            "Sutter Michael", "Holzmann Stefan", "Grohs David", "Nowak Niki",
+            "Vojkovic Vedran", "Brettl Stefan", "Bekirovic Erman", "Alic Edin",
+            "Harcevic Edin", "Fuchs Marco", "Roth Patrick", "Srok Toni",
+            "Vasiljevic Nenad", "Shaljani Drilon", "Dervishi Gentian",
+            "Brettl Thomas", "Gaisruck Manuel", "Zupan Andreas", "Altun Serkan"
+        )
     }
 
     /** Liefert den aktuell angemeldeten Benutzernamen (leer = niemand). */
@@ -44,9 +54,10 @@ class UserStore(private val context: Context) {
 
     /** Versucht Login mit Benutzername + PIN. Liefert den Benutzer oder null. */
     suspend fun login(benutzername: String, pin: String): AppBenutzer? {
-        // Admin immer lokal prüfen
         if (benutzername.trim().equals(ADMIN_NAME, ignoreCase = true) && pin == ADMIN_PIN) {
             setzeAngemeldeterBenutzer(ADMIN_NAME)
+            // Beim Admin-Login Spieler-User anlegen falls noch nicht vorhanden
+            erstelleSpielerUserFallsFehlend()
             return AppBenutzer(id = "admin", benutzername = ADMIN_NAME, pin = ADMIN_PIN, rolle = Benutzerrolle.ADMINS)
         }
         return try {
@@ -59,6 +70,21 @@ class UserStore(private val context: Context) {
             setzeAngemeldeterBenutzer(benutzer.benutzername)
             benutzer
         } catch (e: Exception) { null }
+    }
+
+    /** Legt alle Spieler-User an, die noch nicht in Firestore existieren. */
+    private suspend fun erstelleSpielerUserFallsFehlend() {
+        try {
+            val vorhandene = firestore.collection("benutzer").get().await()
+                .documents.mapNotNull { it.getString("benutzername") }.toSet()
+            for (name in SPIELER_NAMEN) {
+                if (name !in vorhandene) {
+                    firestore.collection("benutzer").add(
+                        hashMapOf("benutzername" to name, "pin" to SPIELER_STANDARD_PIN, "rolle" to Benutzerrolle.SPIELER.name)
+                    ).await()
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     /** Alle Benutzer laden (nur für Admin). */

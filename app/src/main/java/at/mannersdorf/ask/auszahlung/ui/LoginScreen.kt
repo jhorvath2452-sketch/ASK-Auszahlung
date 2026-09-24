@@ -12,10 +12,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,17 +39,22 @@ import at.mannersdorf.ask.auszahlung.data.UserStore
 import at.mannersdorf.ask.auszahlung.data.model.AppBenutzer
 import kotlinx.coroutines.launch
 
-/**
- * Login-Screen: Benutzername + PIN, danach weiter zur App. Wird angezeigt
- * solange kein Benutzer angemeldet ist.
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(userStore: UserStore, onAngemeldet: (AppBenutzer) -> Unit) {
-    var benutzername by remember { mutableStateOf("") }
+    var alleBenutzer by remember { mutableStateOf<List<String>>(emptyList()) }
+    var gewaehlterBenutzer by remember { mutableStateOf("") }
+    var dropdownOffen by remember { mutableStateOf(false) }
     var pin by remember { mutableStateOf("") }
     var fehler by remember { mutableStateOf<String?>(null) }
     var laedt by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    // Alle Benutzernamen laden (inkl. Admin)
+    LaunchedEffect(Unit) {
+        val dbBenutzer = userStore.alleBenutzer().map { it.benutzername }.sorted()
+        alleBenutzer = listOf(UserStore.ADMIN_NAME) + dbBenutzer
+    }
 
     Column(
         Modifier.fillMaxSize().padding(32.dp),
@@ -62,14 +72,39 @@ fun LoginScreen(userStore: UserStore, onAngemeldet: (AppBenutzer) -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(40.dp))
 
-        OutlinedTextField(
-            value = benutzername,
-            onValueChange = { benutzername = it; fehler = null },
-            label = { Text("Benutzername") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
+        // Benutzer-Dropdown
+        ExposedDropdownMenuBox(
+            expanded = dropdownOffen,
+            onExpandedChange = { dropdownOffen = it }
+        ) {
+            OutlinedTextField(
+                value = gewaehlterBenutzer.ifBlank { "Benutzer wählen" },
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Benutzer") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownOffen) },
+                modifier = Modifier.fillMaxWidth().menuAnchor()
+            )
+            ExposedDropdownMenu(
+                expanded = dropdownOffen,
+                onDismissRequest = { dropdownOffen = false }
+            ) {
+                alleBenutzer.forEach { name ->
+                    DropdownMenuItem(
+                        text = { Text(name) },
+                        onClick = {
+                            gewaehlterBenutzer = name
+                            pin = ""
+                            fehler = null
+                            dropdownOffen = false
+                        }
+                    )
+                }
+            }
+        }
+
         Spacer(Modifier.height(12.dp))
+
         OutlinedTextField(
             value = pin,
             onValueChange = { pin = it; fehler = null },
@@ -90,16 +125,16 @@ fun LoginScreen(userStore: UserStore, onAngemeldet: (AppBenutzer) -> Unit) {
             onClick = {
                 scope.launch {
                     laedt = true
-                    val benutzer = userStore.login(benutzername.trim(), pin.trim())
+                    val benutzer = userStore.login(gewaehlterBenutzer.trim(), pin.trim())
                     if (benutzer != null) {
                         onAngemeldet(benutzer)
                     } else {
-                        fehler = "Benutzername oder PIN ungültig."
+                        fehler = "PIN ungültig."
                     }
                     laedt = false
                 }
             },
-            enabled = benutzername.isNotBlank() && pin.isNotBlank() && !laedt,
+            enabled = gewaehlterBenutzer.isNotBlank() && pin.isNotBlank() && !laedt,
             modifier = Modifier.fillMaxWidth()
         ) {
             if (laedt) CircularProgressIndicator(modifier = Modifier.size(20.dp))

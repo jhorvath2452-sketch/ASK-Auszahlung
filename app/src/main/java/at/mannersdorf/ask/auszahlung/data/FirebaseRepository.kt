@@ -460,6 +460,17 @@ class FirebaseRepository {
             }
         }
 
+    suspend fun loescheVertragsformular(id: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                stelleSicherAngemeldet()
+                firestore.collection("vertragsformulare").document(id).delete().await()
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     /** Lädt ein einzelnes Vertragsformular per ID (zum Fortsetzen eines Entwurfs). */
     suspend fun leseVertragsformular(id: String): Result<VertragsFormular> =
         withContext(Dispatchers.IO) {

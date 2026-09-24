@@ -4,7 +4,9 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,9 +22,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,8 +45,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import at.mannersdorf.ask.auszahlung.data.model.SpielerKosten
 import at.mannersdorf.ask.auszahlung.data.model.VertragsDatei
@@ -109,7 +118,17 @@ private fun SpielerListenAnsicht(
     onSpielerGewaehlt: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val namen = remember(alleSpieler) { alleSpieler.map { it.name }.distinct().sorted() }
+    val namen = remember(alleSpieler) {
+        alleSpieler
+            .map { it.name.trim() }
+            .filter { name ->
+                name.isNotBlank() &&
+                !name.contains("freie Zeile", ignoreCase = true) &&
+                !name.startsWith("*")
+            }
+            .distinct()
+            .sorted()
+    }
     Column(modifier.fillMaxSize()) {
         Text("Verträge", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(12.dp))
         if (namen.isEmpty()) {
@@ -149,6 +168,7 @@ private fun DateiListenAnsicht(
     var fehler by remember { mutableStateOf<String?>(null) }
     var zeigeVorlagenAuswahl by remember { mutableStateOf(false) }
     var hochladenLaeuft by remember { mutableStateOf(false) }
+    var zumLoeschenFormularId by remember { mutableStateOf<String?>(null) }
 
     suspend fun neuLaden() {
         laedt = true
@@ -239,16 +259,20 @@ private fun DateiListenAnsicht(
                     }
                 }
             }
+            @OptIn(ExperimentalFoundationApi::class)
             items(formulare, key = { it.id }) { formular ->
                 Card(
                     Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
-                        .clickable {
-                            if (formular.fertigesPdfUrl.isNotBlank()) {
-                                oeffnePdfUrl(context, formular.fertigesPdfUrl)
-                            } else {
-                                onFormularOeffnen(formular.typ, formular.id)
-                            }
-                        }
+                        .combinedClickable(
+                            onClick = {
+                                if (formular.fertigesPdfUrl.isNotBlank()) {
+                                    oeffnePdfUrl(context, formular.fertigesPdfUrl)
+                                } else {
+                                    onFormularOeffnen(formular.typ, formular.id)
+                                }
+                            },
+                            onLongClick = { zumLoeschenFormularId = formular.id }
+                        )
                 ) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Description, contentDescription = null)
@@ -267,8 +291,54 @@ private fun DateiListenAnsicht(
         }
     }
 
-    if (zeigeVorlagenAuswahl) {
+    // Lösch-Dialog für Vertragsformulare
+    zumLoeschenFormularId?.let { formularId ->
+        var pin by remember { mutableStateOf("") }
+        var bestaetigt by remember { mutableStateOf(false) }
         AlertDialog(
+            onDismissRequest = { zumLoeschenFormularId = null },
+            title = { Text("Vertrag löschen?") },
+            text = {
+                Column {
+                    Text("Diesen Vertragsentwurf wirklich löschen?")
+                    OutlinedTextField(
+                        value = pin,
+                        onValueChange = {
+                            pin = it
+                            bestaetigt = false
+                        },
+                        label = { Text("PIN") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                        Checkbox(checked = bestaetigt, onCheckedChange = { bestaetigt = it })
+                        Text("Ja, wirklich löschen")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = bestaetigt && pin == "24521919",
+                    onClick = {
+                        coroutineScope.launch {
+                            viewModel.loescheVertragsformular(formularId)
+                            neuLaden()
+                        }
+                        zumLoeschenFormularId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB3261E))
+                ) { Text("Löschen") }
+            },
+            dismissButton = {
+                TextButton(onClick = { zumLoeschenFormularId = null }) { Text("Abbrechen") }
+            }
+        )
+    }
+
+    if (zeigeVorlagenAuswahl) {        AlertDialog(
             onDismissRequest = { zeigeVorlagenAuswahl = false },
             title = { Text("Neuer Vertrag") },
             text = { Text("Welche Vorlage soll ausgefüllt werden?") },

@@ -32,11 +32,26 @@ class UserStore(private val context: Context) {
 
         /** Alle Spieler von Sutter bis Altun – werden automatisch als User angelegt. */
         val SPIELER_NAMEN = listOf(
-            "Sutter Michael", "Holzmann Stefan", "Grohs David", "Nowak Niki",
-            "Vojkovic Vedran", "Brettl Stefan", "Bekirovic Erman", "Alic Edin",
-            "Harcevic Edin", "Fuchs Marco", "Roth Patrick", "Srok Toni",
-            "Vasiljevic Nenad", "Shaljani Drilon", "Dervishi Gentian",
-            "Brettl Thomas", "Gaisruck Manuel", "Zupan Andreas", "Altun Serkan"
+            "Sutter Patrick",
+            "Bagceci Fati",
+            "Fuchs Marco",
+            "Habula Josip",
+            "Harcevic Edin",
+            "Juhnke Stefan",
+            "Karanitsch Johannes",
+            "Keskin Muhammed",
+            "Kölbl Julian",
+            "Koskinen Antti",
+            "Lazarevic Romeo",
+            "Mujcic Adrian",
+            "Oda Neki",
+            "Okunakol Mumi",
+            "Pinter Felix",
+            "Sejdini Lirian",
+            "Sen Taner",
+            "Shaljani Drilon",
+            "Srok Toni",
+            "Vasiljevic Nenad"
         )
     }
 

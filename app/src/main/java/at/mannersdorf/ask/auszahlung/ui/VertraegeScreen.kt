@@ -83,14 +83,13 @@ fun VertraegeScreen(
 ) {
     val istSpieler = angemeldeterBenutzer?.rolle == at.mannersdorf.ask.auszahlung.data.model.Benutzerrolle.SPIELER
 
-    // Spieler sehen direkt ihre eigene Dateiliste (kein Umweg über Spielerliste)
-    var ansicht by remember(angemeldeterBenutzer) {
-        mutableStateOf<VertraegeAnsicht>(
-            if (istSpieler && angemeldeterBenutzer != null)
-                VertraegeAnsicht.DateiListe(angemeldeterBenutzer.benutzername)
-            else
-                VertraegeAnsicht.SpielerListe
-        )
+    var ansicht by remember { mutableStateOf<VertraegeAnsicht>(VertraegeAnsicht.SpielerListe) }
+
+    // Spieler landen direkt bei ihrer eigenen Dateiliste – nur einmal beim Start
+    LaunchedEffect(angemeldeterBenutzer?.benutzername) {
+        if (istSpieler && angemeldeterBenutzer != null) {
+            ansicht = VertraegeAnsicht.DateiListe(angemeldeterBenutzer.benutzername)
+        }
     }
 
     when (val a = ansicht) {
@@ -102,6 +101,7 @@ fun VertraegeScreen(
         is VertraegeAnsicht.DateiListe -> DateiListenAnsicht(
             spielerName = a.spielerName,
             viewModel = viewModel,
+            istSpieler = istSpieler,
             onZurueck = { ansicht = VertraegeAnsicht.SpielerListe },
             onNeuesFormular = { typ -> ansicht = VertraegeAnsicht.Formular(a.spielerName, typ, null) },
             onFormularOeffnen = { typ, id -> ansicht = VertraegeAnsicht.Formular(a.spielerName, typ, id) },
@@ -171,6 +171,7 @@ private fun SpielerListenAnsicht(
 private fun DateiListenAnsicht(
     spielerName: String,
     viewModel: MainViewModel,
+    istSpieler: Boolean = false,
     onZurueck: () -> Unit,
     onNeuesFormular: (VertragsTyp) -> Unit,
     onFormularOeffnen: (VertragsTyp, String) -> Unit,
@@ -228,8 +229,10 @@ private fun DateiListenAnsicht(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onZurueck) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Zurück")
+                if (!istSpieler) {
+                    IconButton(onClick = onZurueck) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Zurück")
+                    }
                 }
                 Text(spielerName, style = MaterialTheme.typography.titleMedium)
             }

@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,10 +59,17 @@ import at.mannersdorf.ask.auszahlung.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(
+    viewModel: MainViewModel,
+    angemeldeterBenutzer: at.mannersdorf.ask.auszahlung.data.model.AppBenutzer,
+    userStore: at.mannersdorf.ask.auszahlung.data.UserStore,
+    onAbmelden: () -> Unit
+) {
     val zustand by viewModel.zustand.collectAsState()
     var zeigeEinstellungen by remember { mutableStateOf(false) }
+    var zeigeBenutzerverwaltung by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val istAdmin = angemeldeterBenutzer.rolle == at.mannersdorf.ask.auszahlung.data.model.Benutzerrolle.ADMINS
 
     // Wurde die App über eine Push-Benachrichtigung geöffnet (siehe
     // MainActivity), lädt dieser Effekt die betreffende Bestätigung samt
@@ -87,8 +96,12 @@ fun MainScreen(viewModel: MainViewModel) {
             AppKopfzeile(
                 zeigtEinstellungen = zeigeEinstellungen,
                 bereit = zustand.bereit,
-                onZurueck = { zeigeEinstellungen = false },
-                onEinstellungen = { zeigeEinstellungen = true }
+                istAdmin = istAdmin,
+                benutzername = angemeldeterBenutzer.benutzername,
+                onZurueck = { zeigeEinstellungen = false; zeigeBenutzerverwaltung = false },
+                onEinstellungen = { zeigeEinstellungen = true },
+                onBenutzerverwaltung = { zeigeBenutzerverwaltung = true },
+                onAbmelden = onAbmelden
             )
         }
     ) { innenAbstand ->
@@ -96,6 +109,10 @@ fun MainScreen(viewModel: MainViewModel) {
             FussballplatzHintergrund(Modifier.fillMaxSize())
 
             when {
+                zeigeBenutzerverwaltung -> BenutzerverwaltungScreen(
+                    userStore = userStore,
+                    onZurueck = { zeigeBenutzerverwaltung = false }
+                )
                 zeigeEinstellungen -> {
                     SettingsScreen(
                         trainingslisteId = zustand.trainingslisteSheetId,
@@ -293,8 +310,12 @@ fun MainScreen(viewModel: MainViewModel) {
 private fun AppKopfzeile(
     zeigtEinstellungen: Boolean,
     bereit: Boolean,
+    istAdmin: Boolean,
+    benutzername: String,
     onZurueck: () -> Unit,
-    onEinstellungen: () -> Unit
+    onEinstellungen: () -> Unit,
+    onBenutzerverwaltung: () -> Unit,
+    onAbmelden: () -> Unit
 ) {
     Box(Modifier.fillMaxWidth().background(VereinsGruen)) {
         FussballplatzHintergrund(Modifier.matchParentSize())
@@ -341,13 +362,23 @@ private fun AppKopfzeile(
                 }
             }
 
-            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 when {
                     zeigtEinstellungen -> IconButton(onClick = onZurueck) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Zurück", tint = Color.White)
                     }
-                    bereit -> IconButton(onClick = onEinstellungen) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Einstellungen", tint = Color.White)
+                    bereit -> {
+                        if (istAdmin) {
+                            IconButton(onClick = onBenutzerverwaltung) {
+                                Icon(Icons.Filled.Person, contentDescription = "Benutzerverwaltung", tint = Color.White)
+                            }
+                        }
+                        IconButton(onClick = onEinstellungen) {
+                            Icon(Icons.Filled.Settings, contentDescription = "Einstellungen", tint = Color.White)
+                        }
+                        IconButton(onClick = onAbmelden) {
+                            Icon(Icons.Filled.ExitToApp, contentDescription = "Abmelden", tint = Color.White)
+                        }
                     }
                 }
             }

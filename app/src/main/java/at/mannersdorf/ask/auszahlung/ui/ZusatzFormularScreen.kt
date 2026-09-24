@@ -79,10 +79,12 @@ fun ZusatzFormularScreen(
                 fehler = "Formular konnte nicht geladen werden."
             }
         } else {
+            val heute = SimpleDateFormat("dd.MM.yyyy", Locale.GERMANY).format(Date())
             formular = VertragsFormular(
                 typ = VertragsTyp.ZUSATZ,
                 spielerName = spielerName,
                 name = spielerName,
+                datum = heute,
                 erstelltAm = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMANY).format(Date())
             )
         }

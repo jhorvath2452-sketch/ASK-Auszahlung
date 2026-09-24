@@ -210,3 +210,14 @@ data class ZusatzFormular(
     val unterschriftObmann: String? = null,
     val unterschriftSpieler: String? = null
 )
+
+/** Benutzerrolle in der App. */
+enum class Benutzerrolle { ADMINS, SPIELER, TRAINER, VORSTAND }
+
+/** Ein App-Benutzer mit PIN und Rolle. */
+data class AppBenutzer(
+    val id: String = "",
+    val benutzername: String = "",
+    val pin: String = "",
+    val rolle: Benutzerrolle = Benutzerrolle.SPIELER
+)

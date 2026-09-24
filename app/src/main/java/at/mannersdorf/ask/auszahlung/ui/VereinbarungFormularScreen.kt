@@ -83,11 +83,13 @@ fun VereinbarungFormularScreen(
         } else {
             val jahr = Calendar.getInstance().get(Calendar.YEAR)
             val nummer = viewModel.ermittleNaechsteVereinbarungsNummer(jahr) ?: "$jahr#001"
+            val heute = SimpleDateFormat("dd.MM.yyyy", Locale.GERMANY).format(Date())
             formular = VertragsFormular(
                 typ = VertragsTyp.VEREINBARUNG,
                 spielerName = spielerName,
                 nummer = nummer,
                 name = spielerName,
+                datum = heute,
                 erstelltAm = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMANY).format(Date())
             )
         }

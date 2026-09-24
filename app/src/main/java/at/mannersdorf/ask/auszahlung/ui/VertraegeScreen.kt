@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -279,16 +280,35 @@ private fun DateiListenAnsicht(
                             onLongClick = { zumLoeschenFormularId = formular.id }
                         )
                 ) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Description, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Column {
-                            val bezeichnung = if (formular.typ == VertragsTyp.VEREINBARUNG) "Vereinbarung ${formular.nummer}" else "Zusatz zur Vereinbarung"
-                            Text(bezeichnung, fontWeight = FontWeight.Bold)
-                            Text(
-                                if (formular.gestempelt) "Abgeschlossen (gestempelt)" else "Entwurf - noch nicht abgeschlossen",
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                    Row(
+                        Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Filled.Description, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                val bezeichnung = if (formular.typ == VertragsTyp.VEREINBARUNG) "Vereinbarung ${formular.nummer}" else "Zusatz zur Vereinbarung"
+                                Text(bezeichnung, fontWeight = FontWeight.Bold)
+                                Text(
+                                    if (formular.gestempelt) "Abgeschlossen (gestempelt)" else "Entwurf - noch nicht abgeschlossen",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                        if (formular.gestempelt && formular.fertigesPdfUrl.isNotBlank()) {
+                            IconButton(onClick = {
+                                coroutineScope.launch {
+                                    teileViaWhatsApp(context, formular.fertigesPdfUrl,
+                                        if (formular.typ == VertragsTyp.VEREINBARUNG)
+                                            "Vereinbarung ${formular.spielerName} ${formular.nummer}"
+                                        else "Zusatz zur Vereinbarung ${formular.spielerName}"
+                                    )
+                                }
+                            }) {
+                                Icon(Icons.Filled.Share, contentDescription = "Via WhatsApp teilen")
+                            }
                         }
                     }
                 }
@@ -418,6 +438,81 @@ private fun oeffnePdfUrl(context: android.content.Context, url: String) {
     if (url.isBlank()) return
     val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))
     context.startActivity(intent)
+}
+
+/**
+ * Lädt das PDF von der Firebase-Storage-URL herunter und teilt es direkt via
+ * WhatsApp. Ist WhatsApp nicht installiert, öffnet sich der normale Android-
+ * Teilen-Dialog als Fallback.
+ */
+private suspend fun teileViaWhatsApp(context: android.content.Context, pdfUrl: String, betreff: String) {
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            // PDF von URL herunterladen
+            val verbindung = java.net.URL(pdfUrl).openConnection() as java.net.HttpURLConnection
+            verbindung.connect()
+            val bytes = verbindung.inputStream.use { it.readBytes() }
+            verbindung.disconnect()
+
+            // In Cache schreiben
+            val dateiName = "Vertrag_${System.currentTimeMillis()}.pdf"
+            val datei = java.io.File(context.cacheDir, dateiName)
+            datei.writeBytes(bytes)
+
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context, "${context.packageName}.fileprovider", datei
+            )
+
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                // Zuerst WhatsApp direkt versuchen
+                val whatsAppIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    setPackage("com.whatsapp")
+                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    putExtra(android.content.Intent.EXTRA_SUBJECT, betreff)
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val whatsAppBusiness = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    setPackage("com.whatsapp.w4b")
+                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    putExtra(android.content.Intent.EXTRA_SUBJECT, betreff)
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+
+                val pm = context.packageManager
+                val whatsAppVerfuegbar = pm.getLaunchIntentForPackage("com.whatsapp") != null
+                val whatsAppBizVerfuegbar = pm.getLaunchIntentForPackage("com.whatsapp.w4b") != null
+
+                when {
+                    whatsAppVerfuegbar && whatsAppBizVerfuegbar -> {
+                        // Beide installiert → Auswahl anbieten
+                        val chooser = android.content.Intent.createChooser(whatsAppIntent, "Teilen via").apply {
+                            putExtra(android.content.Intent.EXTRA_INITIAL_INTENTS, arrayOf(whatsAppBusiness))
+                        }
+                        context.startActivity(chooser)
+                    }
+                    whatsAppVerfuegbar -> context.startActivity(whatsAppIntent)
+                    whatsAppBizVerfuegbar -> context.startActivity(whatsAppBusiness)
+                    else -> {
+                        // Fallback: normaler Teilen-Dialog
+                        val fallback = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "application/pdf"
+                            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, betreff)
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(android.content.Intent.createChooser(fallback, "Vertrag teilen"))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                // Fehler – direkt URL öffnen als letzter Ausweg
+                oeffnePdfUrl(context, pdfUrl)
+            }
+        }
+    }
 }
 
 private fun formatiereZeitstempel(millisText: String): String {

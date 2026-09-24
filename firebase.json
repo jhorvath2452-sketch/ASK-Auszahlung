@@ -10,7 +10,7 @@
     "rules": "firestore.rules"
   },
   "storage": {
-    "target": "default",
-    "rules": "storage.rules"
+    "rules": "storage.rules",
+    "bucket": "ask-mannersdorf.firebasestorage.app"
   }
 }

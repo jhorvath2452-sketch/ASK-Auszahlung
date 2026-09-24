@@ -47,41 +47,6 @@ object VertragsPdfErsteller {
     private fun liniePaint() = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 0.8f; color = Color.BLACK }
     private fun boxPaint() = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 0.6f; color = Color.BLACK }
 
-    // ── Seitenverwaltung mit automatischem Umbruch ───────────────────────────
-    private inner class Seiten(private val dokument: PdfDocument, private val context: Context,
-                               private val dateiTitel: String) {
-        private var seitenNummer = 0
-        var canvas: Canvas private set
-        var y: Float = 0f
-        private var aktiveSeite: PdfDocument.Page? = null
-
-        init { neueSeite() }
-
-        fun neueSeite() {
-            aktiveSeite?.let { dokument.finishPage(it) }
-            seitenNummer++
-            val pg = dokument.startPage(PdfDocument.PageInfo.Builder(W, H, seitenNummer).create())
-            aktiveSeite = pg
-            canvas = pg.canvas
-            y = 38f
-            fusszeile()
-        }
-
-        fun finalisieren() { aktiveSeite?.let { dokument.finishPage(it); aktiveSeite = null } }
-
-        /** Prüft ob noch mindestens [benoetigt] Punkte Platz sind, sonst neue Seite. */
-        fun sicherstellenPlatz(benoetigt: Float) {
-            if (y + benoetigt > SEITENRAND_UNTEN) neueSeite()
-        }
-
-        private fun fusszeile() {
-            val fg = Paint().apply { color = Color.parseColor("#2E7D32"); style = Paint.Style.FILL }
-            canvas.drawRect(RectF(ML - 10f, FUSSZEILE_Y, MR + 10f, FUSSZEILE_Y + 8f), fg)
-            canvas.drawText(dateiTitel, ML, FUSSZEILE_Y + 6f, p(8f, color = Color.WHITE))
-            canvas.drawText("Seite $seitenNummer", MR, FUSSZEILE_Y + 6f, p(8f, align = Paint.Align.RIGHT, color = Color.WHITE))
-        }
-    }
-
     // ── TextSpan ─────────────────────────────────────────────────────────────
     data class TextSpan(val text: String, val bold: Boolean = false,
                         val underline: Boolean = false, val highlight: String? = null)

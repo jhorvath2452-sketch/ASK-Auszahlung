@@ -13,8 +13,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.launch
 import at.mannersdorf.ask.auszahlung.data.UserStore
 import at.mannersdorf.ask.auszahlung.data.model.AppBenutzer
 import at.mannersdorf.ask.auszahlung.data.model.Benutzerrolle
@@ -49,6 +51,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AuszahlungAppTheme {
+                val scope = rememberCoroutineScope()
                 var angemeldeterBenutzer by remember { mutableStateOf<AppBenutzer?>(null) }
                 var loginGeprueft by remember { mutableStateOf(false) }
 
@@ -88,9 +91,7 @@ class MainActivity : ComponentActivity() {
                         userStore = userStore,
                         onAbmelden = {
                             angemeldeterBenutzer = null
-                            kotlinx.coroutines.MainScope().launch {
-                                userStore.abmelden()
-                            }
+                            scope.launch { userStore.abmelden() }
                         }
                     )
                 }

@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -171,6 +172,7 @@ private fun DateiListenAnsicht(
     var hochladenLaeuft by remember { mutableStateOf(false) }
     var zumLoeschenFormularId by remember { mutableStateOf<String?>(null) }
     var zumLoeschenDateiId by remember { mutableStateOf<String?>(null) }
+    var qrCodeUrl by remember { mutableStateOf<String?>(null) }
 
     suspend fun neuLaden() {
         laedt = true
@@ -309,11 +311,19 @@ private fun DateiListenAnsicht(
                             }) {
                                 Icon(Icons.Filled.Share, contentDescription = "Via WhatsApp teilen")
                             }
+                            IconButton(onClick = { qrCodeUrl = formular.fertigesPdfUrl }) {
+                                Icon(Icons.Filled.QrCode, contentDescription = "QR-Code anzeigen")
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    // QR-Code-Dialog
+    qrCodeUrl?.let { url ->
+        QrCodeDialog(url = url, onSchliessen = { qrCodeUrl = null })
     }
 
     // Lösch-Dialog für hochgeladene Dateien

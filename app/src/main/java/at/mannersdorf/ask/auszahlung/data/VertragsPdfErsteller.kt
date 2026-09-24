@@ -183,7 +183,7 @@ object VertragsPdfErsteller {
 
         // Punkt 1
         c.drawText("1.", ML, y, p(10.5f, bold = true))
-        c.drawText("Fixum:", ML + 18f, y, p(10.5f, bold = true, underline = false).also {
+        c.drawText("Fixum:", ML + 18f, y, p(10.5f, bold = true).also {
             it.isUnderlineText = true
         })
         val p1x = ML + 90f

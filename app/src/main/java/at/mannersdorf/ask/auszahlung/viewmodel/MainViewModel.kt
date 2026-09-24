@@ -175,14 +175,6 @@ class MainViewModel(private val context: Context) : ViewModel() {
     suspend fun ladeDateiHoch(pfad: String, bytes: ByteArray) =
         firebaseRepository.ladeDateiHoch(pfad, bytes)
 
-    // ---------- Verträge ----------
-
-    suspend fun ladeVertraegeFuerSpieler(spielerName: String): Result<List<VertragsDatei>> =
-        firebaseRepository.leseVertraegeFuerSpieler(spielerName)
-
-    suspend fun ladeVertragHoch(spielerName: String, dateiName: String, bytes: ByteArray): Result<Unit> =
-        firebaseRepository.ladeVertragHoch(spielerName, dateiName, bytes)
-
     /** Unverbindliche Vorschau der nächsten Vereinbarungs-Nummer für das aktuelle Jahr. */
     suspend fun holeVorschauVereinbarungsNummer(): String {
         val jahr = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)

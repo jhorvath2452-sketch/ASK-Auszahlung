@@ -192,12 +192,29 @@ private fun DateiListenAnsicht(
 
     suspend fun neuLaden() {
         laedt = true
-        dateien = viewModel.ladeVertraegeFuerSpieler(spielerName)
-        formulare = viewModel.ladeVertragsformulareFuerSpieler(spielerName)
+        try {
+            dateien = viewModel.ladeVertraegeFuerSpieler(spielerName)
+        } catch (e: Exception) {
+            fehler = "Dateien konnten nicht geladen werden: ${e.message}"
+            dateien = emptyList()
+        }
+        try {
+            formulare = viewModel.ladeVertragsformulareFuerSpieler(spielerName)
+        } catch (e: Exception) {
+            fehler = "Formulare konnten nicht geladen werden: ${e.message}"
+            formulare = emptyList()
+        }
         laedt = false
     }
 
-    LaunchedEffect(spielerName) { neuLaden() }
+    LaunchedEffect(spielerName) {
+        try {
+            neuLaden()
+        } catch (e: Exception) {
+            fehler = "Laden fehlgeschlagen: ${e.message}"
+            laedt = false
+        }
+    }
 
     val dateiAuswahlLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()

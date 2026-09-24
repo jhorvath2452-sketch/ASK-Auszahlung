@@ -176,8 +176,14 @@ fun MainScreen(
                             viewModel.wechsleEbene(Ebene.VERTRAEGE)
                         }
 
+                        val sichtbareEbenen = if (istSpieler)
+                            listOf(Ebene.VERTRAEGE)
+                        else
+                            Ebene.entries.toList()
+                        val tabIndex = sichtbareEbenen.indexOf(zustand.aktiveEbene).coerceAtLeast(0)
+
                         ScrollableTabRow(
-                            selectedTabIndex = Ebene.entries.indexOf(zustand.aktiveEbene),
+                            selectedTabIndex = tabIndex,
                             edgePadding = 12.dp
                         ) {
                             if (!istSpieler) {

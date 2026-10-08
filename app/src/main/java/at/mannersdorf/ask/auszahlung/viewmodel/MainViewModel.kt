@@ -309,16 +309,32 @@ class MainViewModel(private val context: Context) : ViewModel() {
             val sheetId = settingsStore.kostenSpielbetriebSheetId.first()
             val spalten = settingsStore.spaltenZuordnung.first()
             val daten = sheetsRepository.leseKostenSpielbetrieb(sheetId, monat, spalten)
-            val ersterSpieler = daten.spieler.firstOrNull()?.name
-            val ersterMasseur = daten.spieler.firstOrNull { it.istMasseur() }?.name
-            val ersterTormanntrainer = daten.spieler.firstOrNull { it.istTormanntrainer() }?.name
-            val ersterBetreuer = daten.spieler.firstOrNull { it.istBetreuung() }?.name
+            val spielerNamen = daten.spieler.map { it.name }.toSet()
+
+            // Beim Monatswechsel die bestehende Auswahl beibehalten,
+            // falls der Spieler/Masseur/etc. im neuen Monat noch vorhanden ist.
+            // Nur wenn noch keine Auswahl existiert ODER der Name nicht mehr
+            // in der neuen Liste vorkommt, auf den ersten Eintrag zurückfallen.
+            val bisherigerSpieler = _zustand.value.gewaehlterSpieler
+            val bisherigerMasseur = _zustand.value.gewaehlterMasseur
+            val bisherigerTormanntrainer = _zustand.value.gewaehlterTormanntrainer
+            val bisherigerBetreuer = _zustand.value.gewaehlterBetreuer
+
+            val neuerSpieler = if (bisherigerSpieler != null && bisherigerSpieler in spielerNamen)
+                bisherigerSpieler else daten.spieler.firstOrNull()?.name
+            val neuerMasseur = if (bisherigerMasseur != null && bisherigerMasseur in spielerNamen)
+                bisherigerMasseur else daten.spieler.firstOrNull { it.istMasseur() }?.name
+            val neuerTormanntrainer = if (bisherigerTormanntrainer != null && bisherigerTormanntrainer in spielerNamen)
+                bisherigerTormanntrainer else daten.spieler.firstOrNull { it.istTormanntrainer() }?.name
+            val neuerBetreuer = if (bisherigerBetreuer != null && bisherigerBetreuer in spielerNamen)
+                bisherigerBetreuer else daten.spieler.firstOrNull { it.istBetreuung() }?.name
+
             _zustand.value = _zustand.value.copy(
                 kostenSpielbetrieb = daten,
-                gewaehlterSpieler = ersterSpieler,
-                gewaehlterMasseur = ersterMasseur,
-                gewaehlterTormanntrainer = ersterTormanntrainer,
-                gewaehlterBetreuer = ersterBetreuer,
+                gewaehlterSpieler = neuerSpieler,
+                gewaehlterMasseur = neuerMasseur,
+                gewaehlterTormanntrainer = neuerTormanntrainer,
+                gewaehlterBetreuer = neuerBetreuer,
                 fehler = null
             )
         } catch (e: Exception) {

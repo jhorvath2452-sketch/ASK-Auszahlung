@@ -38,6 +38,8 @@ data class SpielerKosten(
     val trainingsgeldFaktor: String,
     val masseurFaktor: String,
     val masseurEinsaetze: String,
+    val x: String,
+    val y: String,
     val rohWerte: List<String>
 )
 

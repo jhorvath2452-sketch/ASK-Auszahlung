@@ -515,6 +515,17 @@ class FirebaseRepository {
             }
         }
 
+    // ---------- Bemerkungen ----------
+
+    suspend fun leseBemerkung(personName: String): Result<String> = runCatching {
+        val snap = firestore.collection("bemerkungen").document(personName).get().await()
+        snap.getString("text") ?: ""
+    }
+
+    suspend fun speichereBemerkung(personName: String, text: String): Result<Unit> = runCatching {
+        firestore.collection("bemerkungen").document(personName).set(mapOf("text" to text)).await()
+    }
+
     private fun DocumentSnapshot.toVertragsFormular(): VertragsFormular =
         VertragsFormular(
             id = id,

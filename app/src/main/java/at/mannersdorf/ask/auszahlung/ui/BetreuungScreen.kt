@@ -62,13 +62,14 @@ fun BetreuungScreen(
     gewaehlterName: String?,
     speichernErfolgreich: Boolean,
     onAusgewaehlt: (String) -> Unit,
+    bemerkung: String,
+    onBemerkungGeaendert: (String) -> Unit,
     onDatenUebernehmen: (bemerkung: String, korrektur: String, unterschriftBase64: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val betreuer = remember(alleSpieler) { alleSpieler.filter { it.istBetreuung() } }
     val spieler = betreuer.find { it.name == gewaehlterName }
     var dropdownOffen by remember { mutableStateOf(false) }
-    var bemerkung by remember(gewaehlterName) { mutableStateOf("") }
     var korrektur by remember(gewaehlterName) { mutableStateOf("0") }
     var unterschriftBase64 by remember(gewaehlterName) { mutableStateOf<String?>(null) }
     var zeigeSignaturPad by remember { mutableStateOf(false) }
@@ -149,7 +150,7 @@ fun BetreuungScreen(
 
         OutlinedTextField(
             value = bemerkung,
-            onValueChange = { if (it.length <= 250) bemerkung = it },
+            onValueChange = { if (it.length <= 250) onBemerkungGeaendert(it) },
             label = { Text("Bemerkung") },
             supportingText = { Text("${bemerkung.length}/250") },
             minLines = 2,

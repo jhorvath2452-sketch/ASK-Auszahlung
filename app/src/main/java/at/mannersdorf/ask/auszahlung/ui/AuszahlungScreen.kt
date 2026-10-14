@@ -58,13 +58,14 @@ fun AuszahlungScreen(
     spielerListe: List<SpielerKosten>,
     gewaehlterSpielerName: String?,
     speichernErfolgreich: Boolean,
+    bemerkung: String,
+    onBemerkungGeaendert: (String) -> Unit,
     onSpielerGewaehlt: (String) -> Unit,
     onDatenUebernehmen: (bemerkung: String, betragErhalten: String, korrektur: String, unterschriftBase64: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val spieler = spielerListe.find { it.name == gewaehlterSpielerName }
     var dropdownOffen by remember { mutableStateOf(false) }
-    var bemerkung by remember(gewaehlterSpielerName) { mutableStateOf("") }
     var korrektur by remember(gewaehlterSpielerName) { mutableStateOf("0") }
     var unterschriftBase64 by remember(gewaehlterSpielerName) { mutableStateOf<String?>(null) }
     var zeigeSignaturPad by remember { mutableStateOf(false) }
@@ -170,7 +171,7 @@ fun AuszahlungScreen(
 
         OutlinedTextField(
             value = bemerkung,
-            onValueChange = { if (it.length <= 250) bemerkung = it },
+            onValueChange = { if (it.length <= 250) onBemerkungGeaendert(it) },
             label = { Text("Bemerkung") },
             supportingText = { Text("${bemerkung.length}/250") },
             minLines = 2,

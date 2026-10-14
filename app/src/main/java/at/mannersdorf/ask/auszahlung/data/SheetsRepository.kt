@@ -66,7 +66,7 @@ class SheetsRepository {
         monat: String,
         spalten: SpaltenZuordnung
     ): KostenSpielbetriebDaten {
-        val rohWerte = leseRohWerte(spreadsheetId, "'$monat'!A1:W500")
+        val rohWerte = leseRohWerte(spreadsheetId, "'$monat'!A1:AA500")
         val werte = rohWerte.dropWhile { zeile -> zeile.count { it.isNotBlank() } <= 1 }
         if (werte.isEmpty()) return KostenSpielbetriebDaten(monat, emptyList(), emptyList())
 
@@ -116,6 +116,8 @@ class SheetsRepository {
                 trainingsgeldFaktor = zeile.getOrNull(trainingsgeldFaktorIdx) ?: "",
                 masseurFaktor = zeile.getOrNull(masseurFaktorIdx) ?: "",
                 masseurEinsaetze = zeile.getOrNull(masseurEinsaetzeIdx) ?: "",
+                x = zeile.getOrNull(25) ?: "",
+                y = zeile.getOrNull(26) ?: "",
                 rohWerte = zeile
             )
         }

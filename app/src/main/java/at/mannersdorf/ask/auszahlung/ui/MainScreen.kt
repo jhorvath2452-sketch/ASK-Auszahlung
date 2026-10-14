@@ -237,6 +237,8 @@ fun MainScreen(
                                 spielerListe = zustand.kostenSpielbetrieb?.spieler ?: emptyList(),
                                 gewaehlterSpielerName = zustand.gewaehlterSpieler,
                                 speichernErfolgreich = zustand.speichernErfolgreich,
+                                bemerkung = zustand.bemerkungSpieler,
+                                onBemerkungGeaendert = viewModel::speichereBemerkungSpieler,
                                 onSpielerGewaehlt = viewModel::waehleSpieler,
                                 onDatenUebernehmen = viewModel::speichereAuszahlung,
                                 modifier = Modifier.fillMaxSize()
@@ -246,6 +248,8 @@ fun MainScreen(
                                 alleSpieler = zustand.kostenSpielbetrieb?.spieler ?: emptyList(),
                                 gewaehlterName = zustand.gewaehlterMasseur,
                                 speichernErfolgreich = zustand.speichernErfolgreich,
+                                bemerkung = zustand.bemerkungMasseur,
+                                onBemerkungGeaendert = viewModel::speichereBemerkungMasseur,
                                 onAusgewaehlt = viewModel::waehleMasseur,
                                 onDatenUebernehmen = viewModel::speichereMasseurAuszahlung,
                                 modifier = Modifier.fillMaxSize()
@@ -255,6 +259,8 @@ fun MainScreen(
                                 alleSpieler = zustand.kostenSpielbetrieb?.spieler ?: emptyList(),
                                 gewaehlterName = zustand.gewaehlterTormanntrainer,
                                 speichernErfolgreich = zustand.speichernErfolgreich,
+                                bemerkung = zustand.bemerkungTormanntrainer,
+                                onBemerkungGeaendert = viewModel::speichereBemerkungTormanntrainer,
                                 onAusgewaehlt = viewModel::waehleTormanntrainer,
                                 onDatenUebernehmen = viewModel::speichereTormanntrainerAuszahlung,
                                 modifier = Modifier.fillMaxSize()
@@ -264,6 +270,8 @@ fun MainScreen(
                                 alleSpieler = zustand.kostenSpielbetrieb?.spieler ?: emptyList(),
                                 gewaehlterName = zustand.gewaehlterBetreuer,
                                 speichernErfolgreich = zustand.speichernErfolgreich,
+                                bemerkung = zustand.bemerkungBetreuer,
+                                onBemerkungGeaendert = viewModel::speichereBemerkungBetreuer,
                                 onAusgewaehlt = viewModel::waehleBetreuer,
                                 onDatenUebernehmen = viewModel::speichereBetreuungAuszahlung,
                                 modifier = Modifier.fillMaxSize()

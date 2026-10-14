@@ -79,7 +79,13 @@ data class HauptZustand(
 
     // Gesetzt, wenn die App über eine Push-Benachrichtigung geöffnet wurde -
     // dann soll die betreffende Bestätigung automatisch als PDF geöffnet werden.
-    val ausPushZuOeffnendeBestaetigungId: String? = null
+    val ausPushZuOeffnendeBestaetigungId: String? = null,
+
+    // Persistente Bemerkungen je Spieler/Person (werden aus Firestore geladen)
+    val bemerkungSpieler: String = "",
+    val bemerkungMasseur: String = "",
+    val bemerkungTormanntrainer: String = "",
+    val bemerkungBetreuer: String = ""
 )
 
 /**
@@ -148,10 +154,10 @@ class MainViewModel(private val context: Context) : ViewModel() {
 
     // ---------- Verträge ----------
 
-    suspend fun ladeVertraegeFuerSpieler(spielerName: String) =
+    suspend fun ladeVertraegeFuerSpieler(spielerName: String): List<VertragsDatei> =
         firebaseRepository.leseVertraegeFuerSpieler(spielerName).getOrDefault(emptyList())
 
-    suspend fun ladeVertragHoch(spielerName: String, dateiName: String, bytes: ByteArray) =
+    suspend fun ladeVertragHoch(spielerName: String, dateiName: String, bytes: ByteArray): Result<Unit> =
         firebaseRepository.ladeVertragHoch(spielerName, dateiName, bytes)
 
     suspend fun loescheVertragsformular(id: String) =
@@ -309,34 +315,51 @@ class MainViewModel(private val context: Context) : ViewModel() {
             val sheetId = settingsStore.kostenSpielbetriebSheetId.first()
             val spalten = settingsStore.spaltenZuordnung.first()
             val daten = sheetsRepository.leseKostenSpielbetrieb(sheetId, monat, spalten)
+
             val spielerNamen = daten.spieler.map { it.name }.toSet()
 
-            // Beim Monatswechsel die bestehende Auswahl beibehalten,
-            // falls der Spieler/Masseur/etc. im neuen Monat noch vorhanden ist.
-            // Nur wenn noch keine Auswahl existiert ODER der Name nicht mehr
-            // in der neuen Liste vorkommt, auf den ersten Eintrag zurückfallen.
+            // Aktuell gewählte Personen beibehalten, falls sie im neuen Monat vorhanden sind
             val bisherigerSpieler = _zustand.value.gewaehlterSpieler
             val bisherigerMasseur = _zustand.value.gewaehlterMasseur
-            val bisherigerTormanntrainer = _zustand.value.gewaehlterTormanntrainer
+            val bisherigeTormann = _zustand.value.gewaehlterTormanntrainer
             val bisherigerBetreuer = _zustand.value.gewaehlterBetreuer
 
             val neuerSpieler = if (bisherigerSpieler != null && bisherigerSpieler in spielerNamen)
-                bisherigerSpieler else daten.spieler.firstOrNull()?.name
+                bisherigerSpieler
+            else
+                daten.spieler.firstOrNull { !it.istMasseur() && !it.istTormanntrainer() && !it.istBetreuung() }?.name
+                    ?: daten.spieler.firstOrNull()?.name
+
             val neuerMasseur = if (bisherigerMasseur != null && bisherigerMasseur in spielerNamen)
-                bisherigerMasseur else daten.spieler.firstOrNull { it.istMasseur() }?.name
-            val neuerTormanntrainer = if (bisherigerTormanntrainer != null && bisherigerTormanntrainer in spielerNamen)
-                bisherigerTormanntrainer else daten.spieler.firstOrNull { it.istTormanntrainer() }?.name
+                bisherigerMasseur
+            else
+                daten.spieler.firstOrNull { it.istMasseur() }?.name
+
+            val neueTormann = if (bisherigeTormann != null && bisherigeTormann in spielerNamen)
+                bisherigeTormann
+            else
+                daten.spieler.firstOrNull { it.istTormanntrainer() }?.name
+
             val neuerBetreuer = if (bisherigerBetreuer != null && bisherigerBetreuer in spielerNamen)
-                bisherigerBetreuer else daten.spieler.firstOrNull { it.istBetreuung() }?.name
+                bisherigerBetreuer
+            else
+                daten.spieler.firstOrNull { it.istBetreuung() }?.name
 
             _zustand.value = _zustand.value.copy(
                 kostenSpielbetrieb = daten,
                 gewaehlterSpieler = neuerSpieler,
                 gewaehlterMasseur = neuerMasseur,
-                gewaehlterTormanntrainer = neuerTormanntrainer,
+                gewaehlterTormanntrainer = neueTormann,
                 gewaehlterBetreuer = neuerBetreuer,
                 fehler = null
             )
+
+            // Bemerkungen für die (möglicherweise neuen) Personen laden
+            neuerSpieler?.let { ladeBemerkungFuerSpieler(it) }
+            neuerMasseur?.let { ladeBemerkungFuerMasseur(it) }
+            neueTormann?.let { ladeBemerkungFuerTormanntrainer(it) }
+            neuerBetreuer?.let { ladeBemerkungFuerBetreuer(it) }
+
         } catch (e: Exception) {
             _zustand.value = _zustand.value.copy(fehler = "Kosten Spielbetrieb konnte nicht geladen werden: ${e.message}")
         } finally {
@@ -346,19 +369,72 @@ class MainViewModel(private val context: Context) : ViewModel() {
 
     fun waehleSpieler(name: String) {
         _zustand.value = _zustand.value.copy(gewaehlterSpieler = name, speichernErfolgreich = false)
+        viewModelScope.launch { ladeBemerkungFuerSpieler(name) }
     }
 
     fun waehleMasseur(name: String) {
         _zustand.value = _zustand.value.copy(gewaehlterMasseur = name, speichernErfolgreich = false)
+        viewModelScope.launch { ladeBemerkungFuerMasseur(name) }
     }
 
     fun waehleTormanntrainer(name: String) {
         _zustand.value = _zustand.value.copy(gewaehlterTormanntrainer = name, speichernErfolgreich = false)
+        viewModelScope.launch { ladeBemerkungFuerTormanntrainer(name) }
     }
 
     fun waehleBetreuer(name: String) {
         _zustand.value = _zustand.value.copy(gewaehlterBetreuer = name, speichernErfolgreich = false)
+        viewModelScope.launch { ladeBemerkungFuerBetreuer(name) }
     }
+
+    // ---------- Bemerkungen (persistent in Firestore) ----------
+
+    private suspend fun ladeBemerkungFuerSpieler(name: String) {
+        val text = firebaseRepository.leseBemerkung(name).getOrDefault("")
+        _zustand.value = _zustand.value.copy(bemerkungSpieler = text)
+    }
+
+    private suspend fun ladeBemerkungFuerMasseur(name: String) {
+        val text = firebaseRepository.leseBemerkung(name).getOrDefault("")
+        _zustand.value = _zustand.value.copy(bemerkungMasseur = text)
+    }
+
+    private suspend fun ladeBemerkungFuerTormanntrainer(name: String) {
+        val text = firebaseRepository.leseBemerkung(name).getOrDefault("")
+        _zustand.value = _zustand.value.copy(bemerkungTormanntrainer = text)
+    }
+
+    private suspend fun ladeBemerkungFuerBetreuer(name: String) {
+        val text = firebaseRepository.leseBemerkung(name).getOrDefault("")
+        _zustand.value = _zustand.value.copy(bemerkungBetreuer = text)
+    }
+
+    /** Wird aus den Auszahlungs-Screens aufgerufen, wenn der Nutzer den Text ändert und speichern möchte. */
+    fun speichereBemerkungSpieler(text: String) {
+        _zustand.value = _zustand.value.copy(bemerkungSpieler = text)
+        val name = _zustand.value.gewaehlterSpieler ?: return
+        viewModelScope.launch { firebaseRepository.speichereBemerkung(name, text) }
+    }
+
+    fun speichereBemerkungMasseur(text: String) {
+        _zustand.value = _zustand.value.copy(bemerkungMasseur = text)
+        val name = _zustand.value.gewaehlterMasseur ?: return
+        viewModelScope.launch { firebaseRepository.speichereBemerkung(name, text) }
+    }
+
+    fun speichereBemerkungTormanntrainer(text: String) {
+        _zustand.value = _zustand.value.copy(bemerkungTormanntrainer = text)
+        val name = _zustand.value.gewaehlterTormanntrainer ?: return
+        viewModelScope.launch { firebaseRepository.speichereBemerkung(name, text) }
+    }
+
+    fun speichereBemerkungBetreuer(text: String) {
+        _zustand.value = _zustand.value.copy(bemerkungBetreuer = text)
+        val name = _zustand.value.gewaehlterBetreuer ?: return
+        viewModelScope.launch { firebaseRepository.speichereBemerkung(name, text) }
+    }
+
+    // ---------- Settings ----------
 
     fun setSpaltenZuordnung(zuordnung: SpaltenZuordnung) {
         viewModelScope.launch {

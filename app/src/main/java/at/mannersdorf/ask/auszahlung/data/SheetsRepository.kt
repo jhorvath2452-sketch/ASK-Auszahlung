@@ -116,6 +116,7 @@ class SheetsRepository {
                 trainingsgeldFaktor = zeile.getOrNull(trainingsgeldFaktorIdx) ?: "",
                 masseurFaktor = zeile.getOrNull(masseurFaktorIdx) ?: "",
                 masseurEinsaetze = zeile.getOrNull(masseurEinsaetzeIdx) ?: "",
+                auflaufpraemie = zeile.getOrNull(4) ?: "",   // Spalte E
                 x = zeile.getOrNull(25) ?: "",
                 y = zeile.getOrNull(26) ?: "",
                 rohWerte = zeile

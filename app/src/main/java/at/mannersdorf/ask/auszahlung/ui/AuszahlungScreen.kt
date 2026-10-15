@@ -262,20 +262,10 @@ private fun berechneBasisBetrag(spieler: SpielerKosten): Double {
 }
 
 /**
- * Bonus-Betrag: normal Punkte-Betrag = Spalte D ("Punkte") × Spalte O ("Punkte pro
- * Monat"), bei AP-Spielern stattdessen Auflaufprämie = Spalte C ("AP") × Spalte N
- * ("Einsätze pro Monat").
+ * Bonus-Betrag: direkt aus Spalte E ("Auflaufprämie") des Sheets.
  */
 private fun berechneBonusBetrag(spieler: SpielerKosten): Double {
-    return if (istApSpieler(spieler)) {
-        val ap = parseDeutscheZahl(spieler.ap) ?: 0.0
-        val einsaetze = parseDeutscheZahl(spieler.einsaetze) ?: 0.0
-        ap * einsaetze
-    } else {
-        val punkte = parseDeutscheZahl(spieler.punkte) ?: 0.0
-        val punkteProMonat = parseDeutscheZahl(spieler.punkteMultiplikator) ?: 0.0
-        punkte * punkteProMonat
-    }
+    return parseDeutscheZahl(spieler.auflaufpraemie) ?: 0.0
 }
 
 /**

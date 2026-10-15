@@ -262,10 +262,10 @@ private fun berechneBasisBetrag(spieler: SpielerKosten): Double {
 }
 
 /**
- * Bonus-Betrag: direkt aus Spalte E ("Auflaufprämie") des Sheets.
+ * Bonus-Betrag: direkt aus Spalte E (Index 4) des Sheets via rohWerte.
  */
 private fun berechneBonusBetrag(spieler: SpielerKosten): Double {
-    return parseDeutscheZahl(spieler.auflaufpraemie) ?: 0.0
+    return parseDeutscheZahl(spieler.rohWerte.getOrNull(4) ?: "") ?: 0.0
 }
 
 /**

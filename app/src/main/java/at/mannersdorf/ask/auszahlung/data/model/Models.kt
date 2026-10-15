@@ -38,7 +38,6 @@ data class SpielerKosten(
     val trainingsgeldFaktor: String,
     val masseurFaktor: String,
     val masseurEinsaetze: String,
-    val auflaufpraemie: String,   // Spalte E (Index 4) – direkt aus Sheet
     val x: String,
     val y: String,
     val rohWerte: List<String>
